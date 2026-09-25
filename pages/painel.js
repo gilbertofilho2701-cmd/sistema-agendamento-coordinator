@@ -97,7 +97,7 @@ export default function Coordenador() {
     setError('')
 
     const user = email === 'viniciucoodernador@exemplo.com' || email === 'coordenador@exemplo.com'
-    const pass = senha === '123456'
+    const pass = senha === 'vinicus2701'
 
     if (user && pass) {
       localStorage.setItem('painel_auth', 'true')
