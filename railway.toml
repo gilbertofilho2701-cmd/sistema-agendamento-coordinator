@@ -1,0 +1,9 @@
+[build]
+image = "node:18"
+
+[deploy]
+start_command = "npm start"
+port = 3000
+
+[env]
+PORT = "3000"
