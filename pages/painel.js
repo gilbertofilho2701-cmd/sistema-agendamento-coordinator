@@ -140,11 +140,6 @@ export default function Coordenador() {
 
     // Verify current email matches what's logged in
     const currentEmail = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
-    const currentUserEmail = email || currentEmail || 'viniciucoodernador@exemplo.com'
-
-    if (currentUserEmail !== currentEmail) {
-      // Try to verify current email from login state
-    }
 
     // Save new credentials to localStorage
     localStorage.setItem('painel_email', newEmail)
