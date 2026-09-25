@@ -3,13 +3,17 @@ const fs = require('fs');
 const path = require('path');
 const { SupabaseClient } = require('@supabase/supabase-js');
 
-// Read .env.local for local development
-const envContent = fs.readFileSync(path.join(__dirname, '.env.local'), 'utf-8');
-const envVars = {};
-envContent.split('\n').filter(l => l.includes('=')).forEach(l => {
-  const [k, ...v] = l.trim().split('=');
-  envVars[k] = v.join('=');
-});
+// Read .env.local for local development (optional)
+let envVars = {};
+try {
+  const envContent = fs.readFileSync(path.join(__dirname, '.env.local'), 'utf-8');
+  envContent.split('\n').filter(l => l.includes('=')).forEach(l => {
+    const [k, ...v] = l.trim().split('=');
+    envVars[k] = v.join('=');
+  });
+} catch (e) {
+  // .env.local not found (e.g., on cloud deployment) - use process.env only
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || envVars.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || envVars.SUPABASE_SERVICE_KEY;
