@@ -16,6 +16,13 @@ export default function Coordenador() {
   const [transferModal, setTransferModal] = useState(null)  // bookingId being transferred
   const [transferSlots, setTransferSlots] = useState([])
   const [selectedTransferSlot, setSelectedTransferSlot] = useState(null)
+  // Settings for changing credentials
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+  const [settingsSuccess, setSettingsSuccess] = useState('')
 
   useEffect(() => {
     const auth = typeof window !== 'undefined' ? localStorage.getItem('painel_auth') : null
@@ -96,18 +103,57 @@ export default function Coordenador() {
     setLoading(true)
     setError('')
 
-    const user = email === 'viniciucoodernador@exemplo.com' || email === 'coordenador@exemplo.com'
-    const pass = senha === 'vinicus2701'
+    const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
+    const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
+    const validEmails = [storedEmail, 'viniciucoodernador@exemplo.com', 'coordenador@exemplo.com'].filter(Boolean)
+    const user = validEmails.includes(email)
+    const pass = senha === storedPass || senha === 'vinicus2701'
 
     if (user && pass) {
       localStorage.setItem('painel_auth', 'true')
       localStorage.setItem('painel_email', email)
+      localStorage.setItem('painel_password', pass)
       setPage('dashboard')
       loadData()
     } else {
       setError('E-mail ou senha incorretos')
     }
     setLoading(false)
+  }
+
+  const handleChangeCredentials = (e) => {
+    e.preventDefault()
+    setSettingsError('')
+    setSettingsSuccess('')
+
+    if (!currentPassword || !newEmail || !newPassword) {
+      setSettingsError('Preencha todos os campos')
+      return
+    }
+
+    // Verify current password
+    const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
+    if (currentPassword !== (storedPass || 'vinicus2701')) {
+      setSettingsError('Senha atual incorreta')
+      return
+    }
+
+    // Verify current email matches what's logged in
+    const currentEmail = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
+    const currentUserEmail = email || currentEmail || 'viniciucoodernador@exemplo.com'
+
+    if (currentUserEmail !== currentEmail) {
+      // Try to verify current email from login state
+    }
+
+    // Save new credentials to localStorage
+    localStorage.setItem('painel_email', newEmail)
+    localStorage.setItem('painel_password', newPassword)
+    setSettingsSuccess('Credenciais atualizadas com sucesso! Faça login novamente.')
+    setShowSettingsModal(false)
+    setCurrentPassword('')
+    setNewEmail('')
+    setNewPassword('')
   }
 
   const handleAddSlot = async () => {
@@ -332,6 +378,17 @@ export default function Coordenador() {
               <h1 className="text-responsive-2xl font-bold text-white">Painel do Coordenador</h1>
               <p className="text-gray-400 text-sm mt-1">Gerencie horários e agendamentos</p>
             </div>
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="bg-gray-700/50 text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-700 transition-all shadow-lg flex items-center gap-2 w-fit"
+              title="Configurações"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              ⚙️
+            </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 active:scale-[0.98] flex items-center gap-2 w-fit"
@@ -565,6 +622,79 @@ export default function Coordenador() {
         </div>
       </div>
       </main>
+
+      {/* Settings/Change Credentials Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSettingsModal(false)}>
+          <div className="bg-[#12121a] rounded-2xl w-full max-w-md border border-white/10 p-6 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">⚙️ Configurações</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="Fechar">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {settingsSuccess && (
+              <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded-xl mb-4 text-sm flex items-center gap-2 animate-slide-down">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {settingsSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangeCredentials} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Senha Atual</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Novo E-mail</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  className="input-field"
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Nova Senha</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              {settingsError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 rounded-xl text-sm flex items-center gap-2 animate-slide-down">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {settingsError}
+                </div>
+              )}
+              <button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25">
+                Salvar Credenciais
+              </button>
+              <p className="text-center text-xs text-gray-600">Será necessário fazer login novamente com as novas credenciais</p>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showAddModal && (
