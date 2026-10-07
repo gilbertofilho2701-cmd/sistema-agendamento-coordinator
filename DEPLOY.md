@@ -32,8 +32,7 @@ railway up
 2. Importe repositório
 3. Configurações:
    - Build Command: `npm run build`
-   - Start Command: `node server.js`
-   - Port: 3000
+   - Start Command: (deixe padrão — o Vercel detecta o Next.js)
 4. Adicione Environment Variables no dashboard
 
 ## Variáveis de Ambiente Necessárias
@@ -42,7 +41,16 @@ railway up
 - NEXT_PUBLIC_SUPABASE_URL
 - NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+### Opcionais — WhatsApp Business (ver WHATSAPP_SETUP.md)
+- WHATSAPP_TOKEN
+- WHATSAPP_PHONE_ID
+- WHATSAPP_TO_COORDENADOR
+- WHATSAPP_VERIFY_TOKEN
+- WHATSAPP_TEMPLATE_ALUNO / WHATSAPP_TEMPLATE_COORDENADOR / WHATSAPP_TEMPLATE_LANG
+
 ## Observações
-- O servidor usa `node server.js` (não `next start`)
-- Porta é configurada via `process.env.PORT`
+- O sistema roda `next start` (o mesmo código serve local e produção).
+  Existia um `server.js` separado que reimplementava as rotas e divergia do
+  publicado — foi removido, pois causava funcionalidades que só falhavam no ar.
 - `.env.local` está no `.gitignore` (não envia para GitHub)
+- Migrações SQL ficam em `supabase/migrations/`
