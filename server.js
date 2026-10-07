@@ -158,6 +158,61 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
+      if (pathname === '/api/historico') {
+        if (req.method === 'GET') {
+          const matricula = url.searchParams.get('matricula');
+          if (!matricula) {
+            res.writeHead(400, {'Content-Type':'application/json'});
+            res.end(JSON.stringify({error: 'matrícula é obrigatória'}));
+            return;
+          }
+          const {data, error} = await supabaseAdmin.from('agendamentos').select('*, horarios_disponiveis(*)').eq('matricula', matricula).order('created_at', {ascending: false});
+          if (error) throw error;
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify(data || []));
+          return;
+        }
+      }
+      if (pathname === '/api/notificacao') {
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', c => body += c);
+          req.on('end', async () => {
+            try {
+              const {aluno_id, tipo, mensagem} = JSON.parse(body);
+              // Salvar notificação no banco
+              const {data, error} = await supabaseAdmin.from('notificacoes').insert([{
+                aluno_id,
+                tipo,
+                mensagem,
+                lida: false,
+                created_at: new Date().toISOString()
+              }]).select();
+              if (error) throw error;
+              res.writeHead(201, {'Content-Type':'application/json'});
+              res.end(JSON.stringify({success: true, data: data?.[0]}));
+            } catch (err) {
+              console.error('Notificação error:', err.message);
+              res.writeHead(500, {'Content-Type':'application/json'});
+              res.end(JSON.stringify({error: err.message}));
+            }
+          });
+          return;
+        }
+        if (req.method === 'GET') {
+          const alunoId = url.searchParams.get('aluno_id');
+          if (!alunoId) {
+            res.writeHead(400, {'Content-Type':'application/json'});
+            res.end(JSON.stringify({error: 'aluno_id é obrigatório'}));
+            return;
+          }
+          const {data, error} = await supabaseAdmin.from('notificacoes').select('*').eq('aluno_id', alunoId).order('created_at', {ascending: false});
+          if (error) throw error;
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify(data || []));
+          return;
+        }
+      }
       if (pathname === '/api/agendamento/transfer') {
         if (req.method === 'PUT') {
           let body = '';
@@ -165,6 +220,28 @@ const server = http.createServer(async (req, res) => {
           req.on('end', async () => {
             try {
               const {bookingId, newHorarioId, oldHorarioId} = JSON.parse(body);
+              
+              // Verificar se o novo horário está disponível
+              const {data: newSlot, error: slotError} = await supabaseAdmin
+                .from('horarios_disponiveis')
+                .select('*')
+                .eq('id', newHorarioId)
+                .single();
+              if (slotError) throw slotError;
+              if (!newSlot.disponivel) {
+                res.writeHead(400, {'Content-Type':'application/json'});
+                res.end(JSON.stringify({error: 'Horário não está disponível'}));
+                return;
+              }
+              
+              // Verificar se o agendamento existe
+              const {data: booking, error: bookingError} = await supabaseAdmin
+                .from('agendamentos')
+                .select('*')
+                .eq('id', bookingId)
+                .single();
+              if (bookingError) throw bookingError;
+              
               // Update the booking's horario_id
               const {data: updateData, error: updateError} = await supabaseAdmin
                 .from('agendamentos')
@@ -172,16 +249,20 @@ const server = http.createServer(async (req, res) => {
                 .eq('id', bookingId)
                 .select();
               if (updateError) throw updateError;
-              // Free the old slot
-              await supabaseAdmin.from('horarios_disponiveis')
-                .update({disponivel: true})
-                .eq('id', oldHorarioId);
+              
+              // Free the old slot (se diferente do novo)
+              if (oldHorarioId !== newHorarioId) {
+                await supabaseAdmin.from('horarios_disponiveis')
+                  .update({disponivel: true})
+                  .eq('id', oldHorarioId);
+              }
               // Occupy the new slot
               await supabaseAdmin.from('horarios_disponiveis')
                 .update({disponivel: false})
                 .eq('id', newHorarioId);
+              
               res.writeHead(200, {'Content-Type':'application/json'});
-              res.end(JSON.stringify({success: true}));
+              res.end(JSON.stringify({success: true, data: updateData?.[0]}));
               return;
             } catch (err) {
               console.error('Transfer error:', err.message);

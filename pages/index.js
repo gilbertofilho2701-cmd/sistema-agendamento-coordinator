@@ -30,10 +30,16 @@ export default function Home() {
   const [user, setUser] = useState(null)
   const [bookings, setBookings] = useState([])
   const [nome, setNome] = useState('')
+  const [matricula, setMatricula] = useState('')
+  const [curso, setCurso] = useState('')
+  const [turma, setTurma] = useState('')
   const [errMsg, setErrMsg] = useState('')
   const [assuntoInput, setAssuntoInput] = useState('')
   const [selectedSlot, setSelectedSlot] = useState(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState([])
+  const [notifications, setNotifications] = useState([])
   const nomeInputRef = useRef(null)
 
   useEffect(() => {
@@ -46,6 +52,11 @@ export default function Home() {
     if (savedId && savedNome) {
       setUser({ id: savedId, nome: savedNome })
       setNome(savedNome)
+      // Carregar notificações
+      fetch('/api/notificacao?aluno_id=' + savedId)
+        .then(r => r.json())
+        .then(data => setNotifications(Array.isArray(data) ? data : []))
+        .catch(() => {})
     }
   }, [])
 
@@ -139,7 +150,11 @@ export default function Home() {
           aluno_id: crypto.randomUUID(),
           horario_id: selectedSlot.id,
           motivo: user.nome + ': ' + assuntoInput.trim(),
-          status: 'pending'
+          status: 'pending',
+          nome: user.nome,
+          matricula: matricula,
+          curso: curso,
+          turma: turma
         })
       })
       if (!res.ok) throw new Error('Erro ao solicitar')
@@ -180,10 +195,13 @@ export default function Home() {
           {!user ? (
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <input ref={nomeInputRef} type="text" value={nome} onChange={handleNomeChange} onBlur={confirmName} onKeyDown={(e) => { if (e.key === 'Enter') confirmName() }} placeholder="Seu nome completo" className="input-field w-full sm:w-48 text-sm py-2" />
-              <button onClick={() => { setNome(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+              <input type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="Matrícula" className="input-field w-full sm:w-32 text-sm py-2" />
+              <input type="text" value={curso} onChange={(e) => setCurso(e.target.value)} placeholder="Curso" className="input-field w-full sm:w-32 text-sm py-2" />
+              <input type="text" value={turma} onChange={(e) => setTurma(e.target.value)} placeholder="Turma" className="input-field w-full sm:w-24 text-sm py-2" />
+              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
             </div>
           ) : (
-            <button onClick={() => { setNome(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
           )}
           <textarea
             value={assuntoInput}
@@ -251,6 +269,76 @@ export default function Home() {
         </div>
 
         {errMsg && <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm text-center animate-slide-down">{errMsg}</div>}
+
+        {/* Botão Histórico e Notificações */}
+        {user && (
+          <div className="flex gap-3 mb-4">
+            <button onClick={() => { setShowHistory(!showHistory); if (!showHistory) { fetch('/api/historico?matricula=' + matricula).then(r => r.json()).then(data => setHistory(Array.isArray(data) ? data : [])).catch(() => {}) } }} className="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-all">
+              📋 Histórico
+            </button>
+            <button onClick={() => fetch('/api/notificacao?aluno_id=' + user.id).then(r => r.json()).then(data => setNotifications(Array.isArray(data) ? data : [])).catch(() => {})} className="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl text-sm font-medium text-gray-300 hover:bg-white/10 transition-all relative">
+              🔔 Notificações
+              {notifications.filter(n => !n.lida).length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center text-white font-bold">
+                  {notifications.filter(n => !n.lida).length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Modal Histórico */}
+        {showHistory && user && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowHistory(false)}>
+            <div className="bg-[#12121a] rounded-2xl w-full max-w-lg border border-white/10 p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">Histórico de Atendimentos</h3>
+                <button onClick={() => setShowHistory(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+              </div>
+              {history.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">Nenhum atendimento encontrado</p>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((h, i) => (
+                    <div key={i} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-medium">{h.nome || user.nome}</span>
+                        <span className={`text-xs px-2 py-1 rounded-lg ${h.status === 'confirmed' ? 'bg-green-500/15 text-green-400' : h.status === 'rejected' ? 'bg-red-500/15 text-red-400' : 'bg-yellow-500/15 text-yellow-400'}`}>
+                          {h.status === 'confirmed' ? 'Confirmado' : h.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400 space-y-1">
+                        <p>📅 {h.horarios_disponiveis?.data} às {h.horarios_disponiveis?.hora_inicio?.slice(0,5)}</p>
+                        <p>🎓 {h.curso || 'N/A'} - Turma {h.turma || 'N/A'}</p>
+                        <p>📝 Matrícula: {h.matricula || 'N/A'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal Notificações */}
+        {notifications.length > 0 && user && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setNotifications([])}>
+            <div className="bg-[#12121a] rounded-2xl w-full max-w-md border border-white/10 p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">Notificações</h3>
+                <button onClick={() => setNotifications([])} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+              </div>
+              <div className="space-y-3">
+                {notifications.map((n, i) => (
+                  <div key={i} className={`rounded-xl p-4 border ${n.lida ? 'bg-white/5 border-white/5' : 'bg-blue-500/10 border-blue-500/20'}`}>
+                    <p className="text-sm text-white">{n.mensagem}</p>
+                    <p className="text-xs text-gray-500 mt-2">{new Date(n.created_at).toLocaleString('pt-BR')}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {showConfirmModal && selectedSlot && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
