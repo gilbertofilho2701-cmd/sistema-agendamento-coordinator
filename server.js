@@ -15,8 +15,8 @@ try {
   // .env.local not found (e.g., on cloud deployment) - use process.env only
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || envVars.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || envVars.SUPABASE_SERVICE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || envVars.SUPABASE_URL || 'https://naoqyfuvfqwdckbjemvw.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || envVars.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hb3F5ZnV2ZnF3ZGNrYmplbXZ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTM1Mjc1NCwiZXhwIjoyMTA2OTI4NzU0fQ.krG0jJ378xrkhu1cMFiSHbLfyxukmzNQ1Z2i8FP1-fY';
 const BASE = __dirname;
 const PORT = process.env.PORT || 3000;
 const supabaseAdmin = new SupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);

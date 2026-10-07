@@ -33,6 +33,7 @@ export default function Home() {
   const [matricula, setMatricula] = useState('')
   const [curso, setCurso] = useState('')
   const [turma, setTurma] = useState('')
+  const [telefone, setTelefone] = useState('')
   const [errMsg, setErrMsg] = useState('')
   const [assuntoInput, setAssuntoInput] = useState('')
   const [selectedSlot, setSelectedSlot] = useState(null)
@@ -52,6 +53,15 @@ export default function Home() {
     if (savedId && savedNome) {
       setUser({ id: savedId, nome: savedNome })
       setNome(savedNome)
+      // Carregar dados salvos do aluno
+      const savedMat = localStorage.getItem('aluno_matricula') || ''
+      const savedCurso = localStorage.getItem('aluno_curso') || ''
+      const savedTurma = localStorage.getItem('aluno_turma') || ''
+      const savedTel = localStorage.getItem('aluno_telefone') || ''
+      setMatricula(savedMat)
+      setCurso(savedCurso)
+      setTurma(savedTurma)
+      setTelefone(savedTel)
       // Carregar notificações
       fetch('/api/notificacao?aluno_id=' + savedId)
         .then(r => r.json())
@@ -59,6 +69,15 @@ export default function Home() {
         .catch(() => {})
     }
   }, [])
+
+  // Mantém os dados do aluno salvos enquanto ele digita
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('aluno_matricula', matricula || '')
+    localStorage.setItem('aluno_curso', curso || '')
+    localStorage.setItem('aluno_turma', turma || '')
+    localStorage.setItem('aluno_telefone', telefone || '')
+  }, [matricula, curso, turma, telefone])
 
   const days = availableDates
 
@@ -68,7 +87,7 @@ export default function Home() {
 
   const confirmName = () => {
     if (nome.trim()) {
-      const id = crypto.randomUUID()
+      const id = localStorage.getItem('aluno_id') || crypto.randomUUID()
       localStorage.setItem('aluno_id', id)
       localStorage.setItem('aluno_nome', nome)
       setUser({ id, nome })
@@ -147,14 +166,15 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aluno_id: crypto.randomUUID(),
+          aluno_id: user.id,
           horario_id: selectedSlot.id,
           motivo: user.nome + ': ' + assuntoInput.trim(),
           status: 'pending',
           nome: user.nome,
           matricula: matricula,
           curso: curso,
-          turma: turma
+          turma: turma,
+          telefone: telefone || null
         })
       })
       if (!res.ok) throw new Error('Erro ao solicitar')
@@ -198,10 +218,11 @@ export default function Home() {
               <input type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="Matrícula" className="input-field w-full sm:w-32 text-sm py-2" />
               <input type="text" value={curso} onChange={(e) => setCurso(e.target.value)} placeholder="Curso" className="input-field w-full sm:w-32 text-sm py-2" />
               <input type="text" value={turma} onChange={(e) => setTurma(e.target.value)} placeholder="Turma" className="input-field w-full sm:w-24 text-sm py-2" />
-              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+              <input type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="WhatsApp (DDD+número)" className="input-field w-full sm:w-52 text-sm py-2" />
+              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setTelefone(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
             </div>
           ) : (
-            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setTelefone(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
           )}
           <textarea
             value={assuntoInput}

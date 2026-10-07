@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase, getAvailableSlots, getAllSlots, createBooking, getBookings, addSlot, updateSlot, deleteSlot } from '../lib/supabaseClient'
 
 export default function Coordenador() {
   const [page, setPage] = useState('login')
@@ -23,6 +22,8 @@ export default function Coordenador() {
   const [newPassword, setNewPassword] = useState('')
   const [settingsError, setSettingsError] = useState('')
   const [settingsSuccess, setSettingsSuccess] = useState('')
+  const [whatsappNumero, setWhatsappNumero] = useState('')
+  const [whatsappStatus, setWhatsappStatus] = useState(null)
 
   useEffect(() => {
     const auth = typeof window !== 'undefined' ? localStorage.getItem('painel_auth') : null
@@ -49,6 +50,39 @@ export default function Coordenador() {
       setBookings(Array.isArray(bookingsData) ? bookingsData : [])
     } catch (e) {
       console.error('Erro bookings:', e)
+    }
+  }
+
+  // Atualiza a lista sozinho a cada 20s (novas solicitações aparecem sem dar F5)
+  useEffect(() => {
+    if (page !== 'dashboard') return
+    const intervalo = setInterval(loadData, 20000)
+    return () => clearInterval(intervalo)
+  }, [page])
+
+  // Carrega o número de WhatsApp salvo ao abrir as configurações
+  useEffect(() => {
+    if (!showSettingsModal) return
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(d => { if (d?.whatsapp_coordenador) setWhatsappNumero(d.whatsapp_coordenador) })
+      .catch(() => {})
+  }, [showSettingsModal])
+
+  const handleSalvarWhatsapp = async () => {
+    setWhatsappStatus(null)
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp_coordenador: whatsappNumero })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar')
+      setWhatsappStatus({ ok: true, msg: 'Número salvo: ' + (data.whatsapp_coordenador || '') })
+      setWhatsappNumero(data.whatsapp_coordenador || '')
+    } catch (e) {
+      setWhatsappStatus({ ok: false, msg: 'Erro: ' + e.message })
     }
   }
 
@@ -225,21 +259,18 @@ export default function Coordenador() {
       })
       if (!res.ok) throw new Error('Erro ao aprovar')
       
-      // Notificar aluno
-      const booking = bookings.find(b => b.id === id)
-      if (booking) {
-        try {
-          await fetch('/api/notificacao', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              aluno_id: booking.aluno_id,
-              tipo: 'aprovacao',
-              mensagem: `Seu agendamento foi APROVADO para ${booking.horarios_disponiveis?.data} às ${booking.horarios_disponiveis?.hora_inicio}`
-            })
-          })
-        } catch (e) { console.error('Notificação:', e) }
-      }
+      // Notificar aluno (o servidor monta a mensagem e busca o telefone)
+      try {
+        const nr = await fetch('/api/notificacao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agendamento_id: id, status: 'confirmed' })
+        })
+        const nd = await nr.json()
+        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
+          alert('Agendamento aprovado, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
+        }
+      } catch (e) { console.error('Notificação:', e) }
       
       await loadData()
     } catch (error) {
@@ -256,21 +287,18 @@ export default function Coordenador() {
       })
       if (!res.ok) throw new Error('Erro ao rejeitar')
       
-      // Notificar aluno
-      const booking = bookings.find(b => b.id === id)
-      if (booking) {
-        try {
-          await fetch('/api/notificacao', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              aluno_id: booking.aluno_id,
-              tipo: 'rejeicao',
-              mensagem: `Seu agendamento foi REJEITADO para ${booking.horarios_disponiveis?.data} às ${booking.horarios_disponiveis?.hora_inicio}`
-            })
-          })
-        } catch (e) { console.error('Notificação:', e) }
-      }
+      // Notificar aluno (o servidor monta a mensagem e busca o telefone)
+      try {
+        const nr = await fetch('/api/notificacao', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agendamento_id: id, status: 'rejected' })
+        })
+        const nd = await nr.json()
+        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
+          alert('Agendamento recusado, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
+        }
+      } catch (e) { console.error('Notificação:', e) }
       
       await loadData()
     } catch (error) {
@@ -310,15 +338,19 @@ export default function Coordenador() {
       
       // Enviar notificação para o aluno
       try {
-        await fetch('/api/notificacao', {
+        const nr = await fetch('/api/notificacao', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            aluno_id: booking?.aluno_id,
+            agendamento_id: bookingId,
             tipo: 'transferencia',
-            mensagem: `Seu atendimento foi transferido para ${selectedTransferSlot.data} às ${selectedTransferSlot.hora_inicio}`
+            mensagem: `🔄 Seu atendimento foi transferido para ${selectedTransferSlot.data} às ${selectedTransferSlot.hora_inicio?.slice(0,5)}`
           })
         })
+        const nd = await nr.json()
+        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
+          alert('Horário transferido, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
+        }
       } catch (notifErr) {
         console.error('Erro ao enviar notificação:', notifErr)
       }
@@ -737,6 +769,31 @@ export default function Coordenador() {
               </button>
               <p className="text-center text-xs text-gray-600">Será necessário fazer login novamente com as novas credenciais</p>
             </form>
+
+            <div className="mt-6 pt-6 border-t border-white/10 space-y-4">
+              <h4 className="text-sm font-bold text-white">📱 WhatsApp do coordenador</h4>
+              <p className="text-xs text-gray-500">
+                Número que recebe o aviso de cada nova solicitação de atendimento.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Número com DDD</label>
+                <input
+                  type="tel"
+                  value={whatsappNumero}
+                  onChange={e => setWhatsappNumero(e.target.value)}
+                  className="input-field"
+                  placeholder="(88) 99999-9999"
+                />
+              </div>
+              {whatsappStatus && (
+                <div className={`px-4 py-3 rounded-xl text-sm ${whatsappStatus.ok ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-300'}`}>
+                  {whatsappStatus.msg}
+                </div>
+              )}
+              <button onClick={handleSalvarWhatsapp} className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-bold hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-500/25">
+                Salvar número
+              </button>
+            </div>
           </div>
         </div>
       )}
