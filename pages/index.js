@@ -45,6 +45,8 @@ export default function Home() {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState([])
   const [notifications, setNotifications] = useState([])
+  const [cadastro, setCadastro] = useState({ nome: '', matricula: '', curso: '', turma: '', email: '' })
+  const [erroCadastro, setErroCadastro] = useState('')
   const nomeInputRef = useRef(null)
 
   useEffect(() => {
@@ -58,14 +60,18 @@ export default function Home() {
       setUser({ id: savedId, nome: savedNome })
       setNome(savedNome)
       // Carregar dados salvos do aluno
-      const savedMat = localStorage.getItem('aluno_matricula') || ''
-      const savedCurso = localStorage.getItem('aluno_curso') || ''
-      const savedTurma = localStorage.getItem('aluno_turma') || ''
-      const savedTel = localStorage.getItem('aluno_email') || ''
-      setMatricula(savedMat)
-      setCurso(savedCurso)
-      setTurma(savedTurma)
-      setEmail(savedTel)
+      const dados = {
+        nome: savedNome,
+        matricula: localStorage.getItem('aluno_matricula') || '',
+        curso: localStorage.getItem('aluno_curso') || '',
+        turma: localStorage.getItem('aluno_turma') || '',
+        email: localStorage.getItem('aluno_email') || '',
+      }
+      setCadastro(dados)
+      setMatricula(dados.matricula)
+      setCurso(dados.curso)
+      setTurma(dados.turma)
+      setEmail(dados.email)
       // Carregar notificações
       fetch('/api/notificacao?aluno_id=' + savedId)
         .then(r => r.json())
@@ -85,21 +91,67 @@ export default function Home() {
 
   const days = availableDates
 
-  const handleNomeChange = useCallback((e) => {
-    setNome(e.target.value)
-  }, [])
+  const atualizarCadastro = (campo, valor) => {
+    setCadastro({ ...cadastro, [campo]: valor })
+    if (campo === 'nome') setNome(valor)
+    if (campo === 'matricula') setMatricula(valor)
+    if (campo === 'curso') setCurso(valor)
+    if (campo === 'turma') setTurma(valor)
+    if (campo === 'email') setEmail(valor)
+  }
 
-  const confirmName = () => {
-    if (nome.trim()) {
-      const id = localStorage.getItem('aluno_id') || crypto.randomUUID()
-      localStorage.setItem('aluno_id', id)
-      localStorage.setItem('aluno_nome', nome)
-      setUser({ id, nome })
-    } else {
-      localStorage.removeItem('aluno_id')
-      localStorage.removeItem('aluno_nome')
-      setUser(null)
+  // Para agendar é necessário identificar nome, matrícula, curso, turma e e-mail.
+  const confirmarIdentificacao = () => {
+    const dados = {
+      nome: (cadastro.nome || '').trim(),
+      matricula: (cadastro.matricula || '').trim(),
+      curso: (cadastro.curso || '').trim(),
+      turma: (cadastro.turma || '').trim(),
+      email: (cadastro.email || '').trim(),
     }
+    const faltando = []
+    if (!dados.nome) faltando.push('nome')
+    if (!dados.matricula) faltando.push('matrícula')
+    if (!dados.curso) faltando.push('curso')
+    if (!dados.turma) faltando.push('turma')
+    if (!dados.email) faltando.push('e-mail')
+    if (faltando.length) {
+      setErroCadastro('Para agendar é necessário identificar: ' + faltando.join(', ') + '.')
+      return
+    }
+    if (!emailValido(dados.email)) {
+      setErroCadastro('Informe um e-mail válido — é por ele que você é avisado quando a coordenação confirmar, remarcar ou recusar o atendimento.')
+      return
+    }
+
+    const id = localStorage.getItem('aluno_id') || crypto.randomUUID()
+    localStorage.setItem('aluno_id', id)
+    localStorage.setItem('aluno_nome', dados.nome)
+    localStorage.setItem('aluno_matricula', dados.matricula)
+    localStorage.setItem('aluno_curso', dados.curso)
+    localStorage.setItem('aluno_turma', dados.turma)
+    localStorage.setItem('aluno_email', dados.email)
+
+    setNome(dados.nome)
+    setMatricula(dados.matricula)
+    setCurso(dados.curso)
+    setTurma(dados.turma)
+    setEmail(dados.email)
+    setCadastro(dados)
+    setErroCadastro('')
+    setErrMsg('')
+    setUser({ id, nome: dados.nome })
+  }
+
+  const sair = () => {
+    setNome(''); setMatricula(''); setCurso(''); setTurma(''); setEmail('')
+    setCadastro({ nome: '', matricula: '', curso: '', turma: '', email: '' })
+    setErroCadastro(''); setErrMsg('')
+    setUser(null)
+    setNotifications([])
+    setHistory([])
+    localStorage.removeItem('aluno_id')
+    localStorage.removeItem('aluno_nome')
   }
 
   useEffect(() => {
@@ -154,13 +206,17 @@ export default function Home() {
   }
 
   const handleSlotClick = (slot) => {
-    if (!user || !slot.disponivel) return
+    if (!slot.disponivel) return
+    if (!user) {
+      setErrMsg('Para agendar é necessário identificar nome, matrícula, curso, turma e e-mail.')
+      return
+    }
     if (!emailValido(email)) {
-      setErrMsg('Informe um e-mail válido — é por ele que você recebe a confirmação.')
+      setErrMsg('Informe um e-mail válido — é por ele que você é avisado quando a coordenação confirmar, remarcar ou recusar o atendimento.')
       return
     }
     if (!assuntoInput.trim()) {
-      setErrMsg('Escreva um motivo antes de solicitar')
+      setErrMsg('Escreva o motivo da reunião antes de solicitar')
       return
     }
     setSelectedSlot(slot)
@@ -168,7 +224,17 @@ export default function Home() {
   }
 
   const confirmBooking = async () => {
-    if (!selectedSlot || !assuntoInput.trim()) return
+    if (!selectedSlot) return
+    if (!user || !emailValido(email)) {
+      setShowConfirmModal(false)
+      setErrMsg('Para agendar é necessário identificar nome, matrícula, curso, turma e e-mail.')
+      return
+    }
+    if (!assuntoInput.trim()) {
+      setShowConfirmModal(false)
+      setErrMsg('Escreva o motivo da reunião antes de solicitar')
+      return
+    }
     try {
       const res = await fetch('/api/agendamento', {
         method: 'POST',
@@ -210,33 +276,100 @@ export default function Home() {
       </div>
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8 pb-20">
-        <div className="card glass mb-6 p-5 flex items-center justify-between animate-slide-up">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20">
-              {user?.nome?.charAt(0)?.toUpperCase() || '?'}
+        {/* Instrução de identificação */}
+        <div className="card glass mb-4 p-4 border-blue-500/20 bg-blue-500/5 animate-slide-up">
+          <p className="text-sm text-blue-200">
+            <span className="font-bold text-white">Para agendar é necessário identificar nome, matrícula, curso e turma e e-mail.</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            O e-mail é necessário para que você seja notificado caso a coordenação <span className="text-white">aceite</span>, <span className="text-white">recuse</span> ou <span className="text-white">remarque</span> seu atendimento para outro horário.
+          </p>
+        </div>
+
+        {!user ? (
+          /* Formulário de identificação — obrigatório para agendar */
+          <div className="card glass mb-6 p-5 animate-slide-up">
+            <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Identificação do aluno</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <input
+                ref={nomeInputRef}
+                type="text"
+                value={cadastro.nome}
+                onChange={(e) => atualizarCadastro('nome', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarIdentificacao() }}
+                placeholder="Nome completo"
+                className="input-field text-sm py-2"
+              />
+              <input
+                type="text"
+                value={cadastro.matricula}
+                onChange={(e) => atualizarCadastro('matricula', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarIdentificacao() }}
+                placeholder="Matrícula"
+                className="input-field text-sm py-2"
+              />
+              <input
+                type="text"
+                value={cadastro.curso}
+                onChange={(e) => atualizarCadastro('curso', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarIdentificacao() }}
+                placeholder="Curso"
+                className="input-field text-sm py-2"
+              />
+              <input
+                type="text"
+                value={cadastro.turma}
+                onChange={(e) => atualizarCadastro('turma', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarIdentificacao() }}
+                placeholder="Turma"
+                className="input-field text-sm py-2"
+              />
+              <input
+                type="email"
+                value={cadastro.email}
+                onChange={(e) => atualizarCadastro('email', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarIdentificacao() }}
+                placeholder="E-mail"
+                className="input-field text-sm py-2"
+              />
             </div>
-            <div>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Aluno</p>
-              <p className="font-semibold text-white text-lg">{user?.nome || 'Não identificado'}</p>
-            </div>
+            {erroCadastro && (
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm animate-slide-down">{erroCadastro}</div>
+            )}
+            <button
+              onClick={confirmarIdentificacao}
+              className="mt-4 w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25"
+            >
+              Identificar e liberar horários
+            </button>
           </div>
-          {!user ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-              <input ref={nomeInputRef} type="text" value={nome} onChange={handleNomeChange} onBlur={confirmName} onKeyDown={(e) => { if (e.key === 'Enter') confirmName() }} placeholder="Seu nome completo" className="input-field w-full sm:w-48 text-sm py-2" />
-              <input type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="Matrícula" className="input-field w-full sm:w-32 text-sm py-2" />
-              <input type="text" value={curso} onChange={(e) => setCurso(e.target.value)} placeholder="Curso" className="input-field w-full sm:w-32 text-sm py-2" />
-              <input type="text" value={turma} onChange={(e) => setTurma(e.target.value)} placeholder="Turma" className="input-field w-full sm:w-24 text-sm py-2" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Seu e-mail" className="input-field w-full sm:w-56 text-sm py-2" />
-              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setEmail(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+        ) : (
+          /* Já identificado */
+          <div className="card glass mb-6 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/20">
+                {user?.nome?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Aluno identificado</p>
+                <p className="font-semibold text-white text-lg">{user?.nome}</p>
+                <p className="text-xs text-gray-400">
+                  Matrícula {matricula || '-'} · {curso || '-'} · Turma {turma || '-'} · {email || 'sem e-mail'}
+                </p>
+              </div>
             </div>
-          ) : (
-            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setEmail(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
-          )}
+            <button onClick={sair} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium w-fit">Sair</button>
+          </div>
+        )}
+
+        {/* Motivo da reunião */}
+        <div className="card glass mb-6 p-4 animate-slide-up">
+          <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Motivo da reunião (obrigatório)</label>
           <textarea
             value={assuntoInput}
             onChange={(e) => setAssuntoInput(e.target.value)}
-            placeholder="Motivo da reunião (obrigatório)"
-            className="input-field w-full sm:w-64 text-sm py-2 mt-2"
+            placeholder="Descreva brevemente o assunto que você quer tratar com a coordenação"
+            className="input-field w-full text-sm py-2"
             rows={2}
           />
         </div>
