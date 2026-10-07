@@ -24,10 +24,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // A Meta exige resposta 200 rápida, senão reenvia a mesma mensagem várias vezes.
-  // Por isso respondemos primeiro e só então processamos.
-  res.status(200).json({ received: true })
-
+  // Importante: no Vercel (serverless) a função é congelada assim que a resposta
+  // é enviada. Por isso processamos ANTES de responder — o processamento leva
+  // menos de 1 segundo, bem dentro do limite da Meta. Se algo falhar, ainda
+  // respondemos 200 para a Meta não ficar reenviando a mesma mensagem.
   try {
     const supabase = supabaseAdmin()
     const entradas = req.body?.entry || []
@@ -41,13 +41,17 @@ export default async function handler(req, res) {
           const texto = msg.text?.body || msg.button?.text || msg.interactive?.button_reply?.title || ''
           const buttonId = msg.interactive?.button_reply?.id || msg.button?.payload || null
 
-          await supabase.from('mensagens_whatsapp').insert([{
-            direcao: 'recebida',
-            telefone: msg.from,
-            conteudo: texto,
-            tipo: msg.type,
-            payload: buttonId,
-          }]).then(() => {}, (e) => console.warn('histórico:', e.message))
+          try {
+            await supabase.from('mensagens_whatsapp').insert([{
+              direcao: 'recebida',
+              telefone: msg.from,
+              conteudo: texto,
+              tipo: msg.type,
+              payload: buttonId,
+            }])
+          } catch (e) {
+            console.warn('histórico:', e.message)
+          }
 
           await marcarComoLida(msg.id)
 
@@ -69,4 +73,6 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error('webhook whatsapp erro:', e.message)
   }
+
+  return res.status(200).json({ received: true })
 }
