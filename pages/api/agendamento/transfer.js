@@ -1,12 +1,23 @@
 // Transferência de um agendamento para outro horário.
 // PUT /api/agendamento/transfer { bookingId, newHorarioId, oldHorarioId }
 //
-// Observação: o Vercel trata este arquivo como rota /api/agendamento/transfer
-// (rota específica tem prioridade sobre o catch-all /api/agendamento).
+// O aluno é avisado por e-mail (e por WhatsApp, se ele tiver informado o número).
 import { createClient } from '@supabase/supabase-js'
+import {
+  notificarAluno,
+  registrarAtividade,
+  textoTransferencia,
+  assuntoTransferido,
+} from '../../../lib/notificar'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
+
+const fmtData = (iso) => {
+  if (!iso) return ''
+  const [a, m, d] = String(iso).split('-')
+  return `${d}/${m}/${a}`
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT' && req.method !== 'POST') {
@@ -23,7 +34,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'bookingId e newHorarioId são obrigatórios' })
     }
 
-    // O novo horário precisa existir e estar livre
     const { data: newSlot, error: slotError } = await supabaseAdmin
       .from('horarios_disponiveis')
       .select('*')
@@ -48,14 +58,37 @@ export default async function handler(req, res) {
       .select('*, horarios_disponiveis(*)')
     if (updateError) throw updateError
 
-    // Libera o horário antigo e ocupa o novo
     const antigo = oldHorarioId || booking.horario_id
     if (antigo && String(antigo) !== String(newHorarioId)) {
       await supabaseAdmin.from('horarios_disponiveis').update({ disponivel: true }).eq('id', antigo)
     }
     await supabaseAdmin.from('horarios_disponiveis').update({ disponivel: false }).eq('id', newHorarioId)
 
-    return res.status(200).json({ success: true, data: updateData?.[0] })
+    const atualizado = updateData?.[0] || {}
+
+    // Avisa o aluno por e-mail
+    const aviso = await notificarAluno(supabaseAdmin, {
+      aluno_id: atualizado.aluno_id,
+      tipo: 'transferencia',
+      mensagem: textoTransferencia(atualizado),
+      email: atualizado.email,
+      telefone: atualizado.telefone,
+      assunto: assuntoTransferido,
+      linhas: [
+        { rotulo: 'Aluno', valor: atualizado.nome || '-' },
+        { rotulo: 'Nova data', valor: fmtData(atualizado?.horarios_disponiveis?.data) },
+        { rotulo: 'Novo horário', valor: String(atualizado?.horarios_disponiveis?.hora_inicio || '').slice(0, 5) },
+      ],
+    })
+
+    await registrarAtividade(supabaseAdmin, {
+      autor: 'coordenador',
+      acao: 'transferiu',
+      detalhe: `${atualizado.nome || 'Aluno'} para ${fmtData(atualizado?.horarios_disponiveis?.data)} às ${String(atualizado?.horarios_disponiveis?.hora_inicio || '').slice(0, 5)}`,
+      agendamento_id: atualizado.id,
+    })
+
+    return res.status(200).json({ success: true, data: atualizado, aviso_aluno: aviso })
   } catch (error) {
     console.error('Transfer error:', error.message)
     return res.status(500).json({ error: error.message })

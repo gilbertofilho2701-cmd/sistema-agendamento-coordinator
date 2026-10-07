@@ -9,6 +9,10 @@ function formatDateShort(isoDate) {
   return dias[d.getDay()] + ', ' + d.getDate() + ' ' + meses[d.getMonth()]
 }
 
+function emailValido(email) {
+  return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())
+}
+
 async function loadAvailableDates() {
   try {
     const res = await fetch('/api/slots')
@@ -33,7 +37,7 @@ export default function Home() {
   const [matricula, setMatricula] = useState('')
   const [curso, setCurso] = useState('')
   const [turma, setTurma] = useState('')
-  const [telefone, setTelefone] = useState('')
+  const [email, setEmail] = useState('')
   const [errMsg, setErrMsg] = useState('')
   const [assuntoInput, setAssuntoInput] = useState('')
   const [selectedSlot, setSelectedSlot] = useState(null)
@@ -57,11 +61,11 @@ export default function Home() {
       const savedMat = localStorage.getItem('aluno_matricula') || ''
       const savedCurso = localStorage.getItem('aluno_curso') || ''
       const savedTurma = localStorage.getItem('aluno_turma') || ''
-      const savedTel = localStorage.getItem('aluno_telefone') || ''
+      const savedTel = localStorage.getItem('aluno_email') || ''
       setMatricula(savedMat)
       setCurso(savedCurso)
       setTurma(savedTurma)
-      setTelefone(savedTel)
+      setEmail(savedTel)
       // Carregar notificações
       fetch('/api/notificacao?aluno_id=' + savedId)
         .then(r => r.json())
@@ -76,8 +80,8 @@ export default function Home() {
     localStorage.setItem('aluno_matricula', matricula || '')
     localStorage.setItem('aluno_curso', curso || '')
     localStorage.setItem('aluno_turma', turma || '')
-    localStorage.setItem('aluno_telefone', telefone || '')
-  }, [matricula, curso, turma, telefone])
+    localStorage.setItem('aluno_email', email || '')
+  }, [matricula, curso, turma, email])
 
   const days = availableDates
 
@@ -151,6 +155,10 @@ export default function Home() {
 
   const handleSlotClick = (slot) => {
     if (!user || !slot.disponivel) return
+    if (!emailValido(email)) {
+      setErrMsg('Informe um e-mail válido — é por ele que você recebe a confirmação.')
+      return
+    }
     if (!assuntoInput.trim()) {
       setErrMsg('Escreva um motivo antes de solicitar')
       return
@@ -174,7 +182,7 @@ export default function Home() {
           matricula: matricula,
           curso: curso,
           turma: turma,
-          telefone: telefone || null
+          email: email.trim()
         })
       })
       if (!res.ok) throw new Error('Erro ao solicitar')
@@ -218,11 +226,11 @@ export default function Home() {
               <input type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="Matrícula" className="input-field w-full sm:w-32 text-sm py-2" />
               <input type="text" value={curso} onChange={(e) => setCurso(e.target.value)} placeholder="Curso" className="input-field w-full sm:w-32 text-sm py-2" />
               <input type="text" value={turma} onChange={(e) => setTurma(e.target.value)} placeholder="Turma" className="input-field w-full sm:w-24 text-sm py-2" />
-              <input type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="WhatsApp (DDD+número)" className="input-field w-full sm:w-52 text-sm py-2" />
-              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setTelefone(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Seu e-mail" className="input-field w-full sm:w-56 text-sm py-2" />
+              <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setEmail(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
             </div>
           ) : (
-            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setTelefone(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
+            <button onClick={() => { setNome(''); setMatricula(''); setCurso(''); setTurma(''); setEmail(''); setUser(null); localStorage.removeItem('aluno_id'); localStorage.removeItem('aluno_nome') }} className="text-xs text-gray-500 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-500/10 font-medium">Sair</button>
           )}
           <textarea
             value={assuntoInput}

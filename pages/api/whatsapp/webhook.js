@@ -1,9 +1,14 @@
 // Webhook do WhatsApp Business (Meta Cloud API).
 //
 // GET  /api/whatsapp/webhook  -> verificação exigida pela Meta ao cadastrar a URL
-// POST /api/whatsapp/webhook  -> recebe mensagens/status enviados pela Meta
+// POST /api/whatsapp/webhook  -> recebe as respostas do coordenador e processa o bot
 //
-// A verificação usa WHATSAPP_VERIFY_TOKEN (você inventa o valor e informa na Meta).
+// É por aqui que o coordenador confirma ou recusa um atendimento respondendo no
+// WhatsApp, sem precisar abrir o sistema.
+import { supabaseAdmin } from '../../../lib/notificar'
+import { processarMensagem } from '../../../lib/bot'
+import { marcarComoLida } from '../../../lib/whatsapp'
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const modo = req.query['hub.mode']
@@ -15,26 +20,53 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'verify_token inválido' })
   }
 
-  if (req.method === 'POST') {
-    // A Meta espera 200 rápido, senão reenvia a mesma mensagem
-    try {
-      const entradas = req.body?.entry || []
-      for (const entrada of entradas) {
-        for (const mudanca of entrada.changes || []) {
-          const valor = mudanca.value || {}
-          for (const msg of valor.messages || []) {
-            console.log('WhatsApp recebido de', msg.from, ':', msg.text?.body || msg.type)
-          }
-          for (const st of valor.statuses || []) {
-            console.log('WhatsApp status', st.status, 'para', st.recipient_id)
-          }
-        }
-      }
-    } catch (e) {
-      console.error('webhook whatsapp erro:', e.message)
-    }
-    return res.status(200).json({ received: true })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  return res.status(405).json({ error: 'Method not allowed' })
+  // A Meta exige resposta 200 rápida, senão reenvia a mesma mensagem várias vezes.
+  // Por isso respondemos primeiro e só então processamos.
+  res.status(200).json({ received: true })
+
+  try {
+    const supabase = supabaseAdmin()
+    const entradas = req.body?.entry || []
+
+    for (const entrada of entradas) {
+      for (const mudanca of entrada.changes || []) {
+        const valor = mudanca.value || {}
+
+        // 1. Guarda o que foi enviado/recebido (histórico da conversa)
+        for (const msg of valor.messages || []) {
+          const texto = msg.text?.body || msg.button?.text || msg.interactive?.button_reply?.title || ''
+          const buttonId = msg.interactive?.button_reply?.id || msg.button?.payload || null
+
+          await supabase.from('mensagens_whatsapp').insert([{
+            direcao: 'recebida',
+            telefone: msg.from,
+            conteudo: texto,
+            tipo: msg.type,
+            payload: buttonId,
+          }]).then(() => {}, (e) => console.warn('histórico:', e.message))
+
+          await marcarComoLida(msg.id)
+
+          // 2. Processa a decisão do coordenador
+          const r = await processarMensagem(supabase, {
+            telefone: msg.from,
+            texto,
+            buttonId,
+            messageId: msg.id,
+          })
+          console.log('bot:', JSON.stringify(r))
+        }
+
+        for (const st of valor.statuses || []) {
+          console.log('whatsapp status:', st.status, '->', st.recipient_id)
+        }
+      }
+    }
+  } catch (e) {
+    console.error('webhook whatsapp erro:', e.message)
+  }
 }

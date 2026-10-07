@@ -24,6 +24,40 @@ export default function Coordenador() {
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [whatsappNumero, setWhatsappNumero] = useState('')
   const [whatsappStatus, setWhatsappStatus] = useState(null)
+  const [showNotif, setShowNotif] = useState(false)
+  const [notificacoes, setNotificacoes] = useState([])
+  const [atividades, setAtividades] = useState([])
+
+  const loadNotificacoes = async () => {
+    try {
+      const res = await fetch('/api/notificacao?destinatario=coordenador')
+      const data = await res.json()
+      setNotificacoes(Array.isArray(data) ? data : [])
+    } catch (e) { console.error('notificações:', e) }
+  }
+
+  const loadAtividades = async () => {
+    try {
+      const res = await fetch('/api/atividades?limit=30')
+      const data = await res.json()
+      setAtividades(Array.isArray(data) ? data : [])
+    } catch (e) { console.error('atividades:', e) }
+  }
+
+  const marcarNotificacoesLidas = async () => {
+    const ids = notificacoes.filter(n => !n.lida).map(n => n.id)
+    if (!ids.length) return
+    try {
+      await fetch('/api/notificacao', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      })
+      setNotificacoes(notificacoes.map(n => ({ ...n, lida: true })))
+    } catch (e) { console.error(e) }
+  }
+
+  const naoLidasCoordenador = notificacoes.filter(n => !n.lida).length
 
   useEffect(() => {
     const auth = typeof window !== 'undefined' ? localStorage.getItem('painel_auth') : null
@@ -51,6 +85,7 @@ export default function Coordenador() {
     } catch (e) {
       console.error('Erro bookings:', e)
     }
+    loadNotificacoes()
   }
 
   // Atualiza a lista sozinho a cada 20s (novas solicitações aparecem sem dar F5)
@@ -456,6 +491,18 @@ export default function Coordenador() {
               <p className="text-gray-400 text-sm mt-1">Gerencie horários e agendamentos</p>
             </div>
             <button
+              onClick={() => { setShowNotif(!showNotif); if (!showNotif) { loadNotificacoes(); loadAtividades() } }}
+              className="bg-gray-700/50 text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-700 transition-all shadow-lg flex items-center gap-2 w-fit relative"
+              title="Notificações e atividades"
+            >
+              🔔
+              {naoLidasCoordenador > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {naoLidasCoordenador}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setShowSettingsModal(true)}
               className="bg-gray-700/50 text-white px-4 py-3 rounded-xl font-bold hover:bg-gray-700 transition-all shadow-lg flex items-center gap-2 w-fit"
               title="Configurações"
@@ -592,6 +639,10 @@ export default function Coordenador() {
                     <div>
                       <p className="font-medium text-white text-sm">{getBookingName(booking) || 'Aluno'}</p>
                       <p className="text-xs text-gray-500">{booking.motivo || ''} · {booking.horarios_disponiveis?.hora_inicio?.slice(0, 5)} · {booking.horarios_disponiveis?.data || ''}</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">
+                        {booking.email || 'sem e-mail'}
+                        {booking.confirmado_via === 'whatsapp' && <span className="text-green-400"> · ✅ decidido pelo WhatsApp</span>}
+                      </p>
                     </div>
                   </div>
                   {booking.status === 'pending' ? (
@@ -794,6 +845,55 @@ export default function Coordenador() {
                 Salvar número
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notificações e atividades */}
+      {showNotif && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowNotif(false)}>
+          <div className="bg-[#12121a] rounded-2xl w-full max-w-lg border border-white/10 p-6 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-bold text-white">🔔 Notificações</h3>
+              <div className="flex items-center gap-2">
+                <button onClick={marcarNotificacoesLidas} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 transition-all">Marcar lidas</button>
+                <button onClick={() => setShowNotif(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="Fechar">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {notificacoes.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6">Nenhuma notificação ainda.</p>
+            ) : (
+              <div className="space-y-2 mb-6">
+                {notificacoes.slice(0, 15).map((n) => (
+                  <div key={n.id} className={`p-3 rounded-xl border text-sm whitespace-pre-line ${n.lida ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-blue-500/10 border-blue-500/20 text-white'}`}>
+                    {n.mensagem}
+                    <p className="text-[10px] text-gray-500 mt-2">{new Date(n.created_at).toLocaleString('pt-BR')}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h4 className="text-sm font-bold text-white mb-3">📋 Atividades recentes</h4>
+            {atividades.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">Sem atividades registradas.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {atividades.map((a) => (
+                  <div key={a.id} className="flex items-start gap-2 text-xs text-gray-400 py-1.5 border-b border-white/5 last:border-0">
+                    <span className="shrink-0">
+                      {a.autor === 'aluno' ? '🎓' : a.autor === 'coordenador' ? '👨‍🏫' : '⚙️'}
+                    </span>
+                    <span className="flex-1">{a.detalhe || a.acao}</span>
+                    <span className="shrink-0 text-gray-600">{new Date(a.created_at).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
