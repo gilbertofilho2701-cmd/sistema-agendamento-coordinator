@@ -13,6 +13,8 @@ export default function Coordenador() {
   const [formData, setFormData] = useState({ data: '', hora_inicio: '', hora_fim: '', disponivel: true, local: '' })
   const [success, setSuccess] = useState('')
   const [transferModal, setTransferModal] = useState(null)  // bookingId being transferred
+  const [transferBooking, setTransferBooking] = useState(null)
+  const [transferErro, setTransferErro] = useState('')
   const [transferSlots, setTransferSlots] = useState([])
   const [selectedTransferSlot, setSelectedTransferSlot] = useState(null)
   // Settings for changing credentials
@@ -125,11 +127,15 @@ export default function Coordenador() {
     try {
       const res = await fetch('/api/slots')
       const data = await res.json()
-      // Filter available slots (disponivel: true) and exclude the booking's current slot
+      // Só horários livres (o atual do aluno está ocupado, então não aparece)
       const available = Array.isArray(data) ? data.filter(s => s.disponivel) : []
       setTransferSlots(available)
       setTransferModal(bookingId)
       setSelectedTransferSlot(null)
+      // Guarda de quem é o atendimento, para mostrar no modal
+      const b = bookings.find(x => x.id === bookingId)
+      setTransferBooking(b || null)
+      setTransferErro('')
     } catch (e) {
       console.error(e)
     }
@@ -356,6 +362,7 @@ export default function Coordenador() {
 
   const handleTransfer = async (bookingId) => {
     if (!selectedTransferSlot) return
+    setTransferErro('')
     try {
       // Find the old slot ID from the booking
       const booking = bookings.find(b => b.id === bookingId)
@@ -369,7 +376,11 @@ export default function Coordenador() {
           oldHorarioId
         })
       })
-      if (!res.ok) throw new Error('Erro ao transferir')
+      const corpo = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setTransferErro(corpo.error || 'Erro ao transferir')
+        return
+      }
       
       // Enviar notificação para o aluno
       try {
@@ -379,7 +390,7 @@ export default function Coordenador() {
           body: JSON.stringify({
             agendamento_id: bookingId,
             tipo: 'transferencia',
-            mensagem: `🔄 Seu atendimento foi transferido para ${selectedTransferSlot.data} às ${selectedTransferSlot.hora_inicio?.slice(0,5)}`
+            mensagem: `🔄 Seu atendimento foi REMARCADO para ${selectedTransferSlot.data} às ${selectedTransferSlot.hora_inicio?.slice(0,5)}`
           })
         })
         const nd = await nr.json()
@@ -559,7 +570,7 @@ export default function Coordenador() {
                     <div className="flex gap-2">
                       <button onClick={() => handleApprove(b.id)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors">Aprovar</button>
                       <button onClick={() => handleReject(b.id)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors">Rejeitar</button>
-                      <button onClick={() => loadTransferSlots(b.id)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">Transferir</button>
+                      <button onClick={() => loadTransferSlots(b.id)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">Remarcar</button>
                     </div>
                   </div>
                 ))}
@@ -650,11 +661,23 @@ export default function Coordenador() {
                       <span className="bg-yellow-500/15 text-yellow-400 text-[10px] font-bold px-2 py-1 rounded-lg">Pendente</span>
                       <button onClick={() => handleApprove(booking.id)} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors">Aprovar</button>
                       <button onClick={() => handleReject(booking.id)} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors">Rejeitar</button>
+                      <button onClick={() => loadTransferSlots(booking.id)} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">Remarcar</button>
                     </div>
                   ) : (
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${(booking.status === 'confirmed' || booking.status === 'aprovado') ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
-                      {booking.status === 'confirmed' || booking.status === 'aprovado' ? '✓ Aprovado' : '✗ Rejeitado'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${(booking.status === 'confirmed' || booking.status === 'aprovado') ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+                        {booking.status === 'confirmed' || booking.status === 'aprovado' ? '✓ Aprovado' : '✗ Rejeitado'}
+                      </span>
+                      {(booking.status === 'confirmed' || booking.status === 'aprovado') && (
+                        <button
+                          onClick={() => loadTransferSlots(booking.id)}
+                          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
+                          title="Imprevisto? Mova este aluno para outro horário livre"
+                        >
+                          Remarcar
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -665,18 +688,30 @@ export default function Coordenador() {
       {transferModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setTransferModal(null)}>
           <div className="bg-[#12121a] rounded-2xl w-full max-w-md border border-white/10 p-6 animate-scale-in max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white">Transferir Horário</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">Remarcar atendimento</h3>
               <button onClick={() => setTransferModal(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="Fechar">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <p className="text-gray-400 text-sm mb-4">Escolha o novo horário para este agendamento:</p>
-            <div className="space-y-2 mb-6">
+
+            {/* De quem é o atendimento e onde ele está agora */}
+            {transferBooking && (
+              <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-sm text-white font-medium">{transferBooking.nome || 'Aluno'}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Hoje: {transferBooking.horarios_disponiveis?.data} às {transferBooking.horarios_disponiveis?.hora_inicio?.slice(0, 5)}
+                  {transferBooking.matricula ? ' · Matrícula ' + transferBooking.matricula : ''}
+                </p>
+              </div>
+            )}
+
+            <p className="text-gray-400 text-sm mb-3">Escolha o novo horário (só aparecem os livres):</p>
+            <div className="space-y-2 mb-4">
               {transferSlots.length === 0 ? (
-                <p className="text-gray-600 text-sm">Nenhum slot disponível.</p>
+                <p className="text-gray-600 text-sm">Nenhum horário livre. Cadastre um novo horário antes de remarcar.</p>
               ) : (
                 transferSlots.map((slot) => (
                   <div key={slot.id} className={`flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all ${selectedTransferSlot?.id === slot.id ? 'bg-blue-500/20 border-blue-500/50' : 'bg-black/20 border-white/5 hover:border-blue-500/30'}`} onClick={() => setSelectedTransferSlot(slot)}>
@@ -689,12 +724,23 @@ export default function Coordenador() {
                 ))
               )}
             </div>
+
+            {selectedTransferSlot && transferBooking && (
+              <p className="text-xs text-blue-300 mb-3">
+                {transferBooking.nome || 'O aluno'} sai de {transferBooking.horarios_disponiveis?.data} {transferBooking.horarios_disponiveis?.hora_inicio?.slice(0,5)} e passa para {selectedTransferSlot.data} {selectedTransferSlot.hora_inicio?.slice(0,5)}. O horário antigo volta a ficar livre.
+              </p>
+            )}
+
+            {transferErro && (
+              <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">{transferErro}</div>
+            )}
+
             <button
               onClick={() => handleTransfer(transferModal)}
               disabled={!selectedTransferSlot}
               className={`w-full py-3 rounded-xl font-bold transition-all ${selectedTransferSlot ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
             >
-              Confirmar Transferência
+              Confirmar Remarcação
             </button>
           </div>
         </div>
