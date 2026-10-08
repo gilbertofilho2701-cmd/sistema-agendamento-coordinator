@@ -61,5 +61,5 @@
 
 ## Credenciais e Links
 
-As credenciais do coordenador e links do sistema estão no repositório privado:
-`https://github.com/gilmadara2872/coordinator-app-credentials`
+As credenciais do coordenador e links do sistema estão na pasta `.private/` dentro deste repositório.
+Essa pasta está no `.gitignore` e **não é enviada para o GitHub** — só existe no seu computador local.
