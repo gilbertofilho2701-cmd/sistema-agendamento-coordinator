@@ -8,6 +8,7 @@ export default function Coordenador() {
   const [loading, setLoading] = useState(false)
   const [slots, setSlots] = useState([])
   const [bookings, setBookings] = useState([])
+  const [erroCarregamento, setErroCarregamento] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingSlot, setEditingSlot] = useState(null)
   const [formData, setFormData] = useState({ data: '', hora_inicio: '', hora_fim: '', disponivel: true, local: '' })
@@ -15,6 +16,7 @@ export default function Coordenador() {
   const [transferModal, setTransferModal] = useState(null)  // bookingId being transferred
   const [transferBooking, setTransferBooking] = useState(null)
   const [transferErro, setTransferErro] = useState('')
+  const [liberarAntigo, setLiberarAntigo] = useState(true)
   const [transferSlots, setTransferSlots] = useState([])
   const [selectedTransferSlot, setSelectedTransferSlot] = useState(null)
   // Settings for changing credentials
@@ -79,13 +81,21 @@ export default function Coordenador() {
       setSlots(Array.isArray(slotsData) ? slotsData : [])
     } catch (e) {
       console.error('Erro slots:', e)
+      setErroCarregamento('Não foi possível carregar os horários. Verifique sua conexão.')
     }
     try {
       const bookingsRes = await fetch('/api/agendamento')
       const bookingsData = await bookingsRes.json()
-      setBookings(Array.isArray(bookingsData) ? bookingsData : [])
+      // Normaliza o status para minúsculas (evita 'Pending' vs 'pending')
+      const normalizados = (Array.isArray(bookingsData) ? bookingsData : []).map(b => ({
+        ...b,
+        status: (b.status || 'pending').toLowerCase()
+      }))
+      setBookings(normalizados)
+      setErroCarregamento('')
     } catch (e) {
       console.error('Erro bookings:', e)
+      setErroCarregamento('Não foi possível carregar as solicitações. Verifique sua conexão.')
     }
     loadNotificacoes()
   }
@@ -132,6 +142,7 @@ export default function Coordenador() {
       setTransferSlots(available)
       setTransferModal(bookingId)
       setSelectedTransferSlot(null)
+      setLiberarAntigo(true)
       // Guarda de quem é o atendimento, para mostrar no modal
       const b = bookings.find(x => x.id === bookingId)
       setTransferBooking(b || null)
@@ -242,16 +253,37 @@ export default function Coordenador() {
     setLoading(true)
     setError('')
 
-    const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
-    const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
+    // Lê credenciais com fallback para sessionStorage (celular/modo privado)
+    let storedEmail = null, storedPass = null
+    try {
+      storedEmail = localStorage.getItem('painel_email')
+      storedPass = localStorage.getItem('painel_password')
+    } catch (e) {
+      try {
+        storedEmail = sessionStorage.getItem('painel_email')
+        storedPass = sessionStorage.getItem('painel_password')
+      } catch (e2) { /* ignora */ }
+    }
+
     const validEmails = [storedEmail, 'viniciucoodernador@exemplo.com', 'coordenador@exemplo.com'].filter(Boolean)
     const user = validEmails.includes(email)
     const pass = senha === storedPass || senha === '123456' || senha === 'vinicus2701'
 
     if (user && pass) {
-      localStorage.setItem('painel_auth', 'true')
-      localStorage.setItem('painel_email', email)
-      localStorage.setItem('painel_password', pass)
+      // Salva em localStorage com fallback para sessionStorage (celular)
+      try {
+        localStorage.setItem('painel_auth', 'true')
+        localStorage.setItem('painel_email', email)
+        localStorage.setItem('painel_password', pass)
+      } catch (e) {
+        try {
+          sessionStorage.setItem('painel_auth', 'true')
+          sessionStorage.setItem('painel_email', email)
+          sessionStorage.setItem('painel_password', pass)
+        } catch (e2) {
+          console.error('Erro ao salvar credenciais:', e2)
+        }
+      }
       setPage('dashboard')
       loadData()
     } else {
@@ -437,7 +469,8 @@ export default function Coordenador() {
         body: JSON.stringify({
           bookingId,
           newHorarioId: selectedTransferSlot.id,
-          oldHorarioId
+          oldHorarioId,
+          liberarAntigo
         })
       })
       const corpo = await res.json().catch(() => ({}))
@@ -599,6 +632,17 @@ export default function Coordenador() {
             </button>
           </div>
         </div>
+
+        {/* Erro de carregamento */}
+        {erroCarregamento && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm flex items-center gap-2 animate-slide-down">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {erroCarregamento}
+            <button onClick={loadData} className="ml-auto text-xs font-bold px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors">Tentar novamente</button>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 animate-slide-up" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
@@ -791,8 +835,26 @@ export default function Coordenador() {
 
             {selectedTransferSlot && transferBooking && (
               <p className="text-xs text-blue-300 mb-3">
-                {transferBooking.nome || 'O aluno'} sai de {transferBooking.horarios_disponiveis?.data} {transferBooking.horarios_disponiveis?.hora_inicio?.slice(0,5)} e passa para {selectedTransferSlot.data} {selectedTransferSlot.hora_inicio?.slice(0,5)}. O horário antigo volta a ficar livre.
+                {transferBooking.nome || 'O aluno'} sai de {transferBooking.horarios_disponiveis?.data} {transferBooking.horarios_disponiveis?.hora_inicio?.slice(0,5)} e passa para {selectedTransferSlot.data} {selectedTransferSlot.hora_inicio?.slice(0,5)}.
               </p>
+            )}
+
+            {selectedTransferSlot && transferBooking && (
+              <label className="flex items-start gap-2 mb-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={liberarAntigo}
+                  onChange={(e) => setLiberarAntigo(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-blue-500"
+                />
+                <span className="text-xs text-gray-300">
+                  <span className="font-bold text-white">Liberar o horário antigo</span>
+                  <br />
+                  {liberarAntigo
+                    ? 'O horário que o aluno saiu fica livre para outro aluno agendar.'
+                    : 'O horário que o aluno saiu continua ocupado (não aparece para outros alunos).'}
+                </span>
+              </label>
             )}
 
             {transferErro && (

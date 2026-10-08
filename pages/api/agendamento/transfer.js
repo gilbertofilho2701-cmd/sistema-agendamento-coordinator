@@ -59,7 +59,8 @@ export default async function handler(req, res) {
     if (updateError) throw updateError
 
     const antigo = oldHorarioId || booking.horario_id
-    if (antigo && String(antigo) !== String(newHorarioId)) {
+    const liberarAntigo = req.body?.liberarAntigo !== false // padrão: libera
+    if (antigo && String(antigo) !== String(newHorarioId) && liberarAntigo) {
       await supabaseAdmin.from('horarios_disponiveis').update({ disponivel: true }).eq('id', antigo)
     }
     await supabaseAdmin.from('horarios_disponiveis').update({ disponivel: false }).eq('id', newHorarioId)

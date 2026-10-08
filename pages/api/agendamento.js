@@ -129,6 +129,8 @@ export default async function handler(req, res) {
       if (error) throw error
 
       const atualizado = data?.[0] || {}
+      // Ao aprovar, o horário já está ocupado (foi ocupado quando o aluno agendou).
+      // Só libera o horário se for rejeitar.
       if (status === 'rejected' && atualizado.horario_id) {
         await supabaseAdmin.from('horarios_disponiveis').update({ disponivel: true }).eq('id', atualizado.horario_id)
       }
