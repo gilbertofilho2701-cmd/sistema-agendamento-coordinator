@@ -1,56 +1,65 @@
 # Deploy na Nuvem
 
-## Opções de Hospedagem
+## Status Atual
 
-### Railway (Recomendado)
-1. Crie conta em railway.app
-2. Instale CLI: `npm install -g @railway/cli`
-3. Conecte ao GitHub
-4. Deploy automático:
-```bash
-railway init
-railway up
-```
-5. No dashboard do Railway, adicione as variáveis de ambiente:
-   - `SUPABASE_URL` = sua URL do Supabase
-   - `SUPABASE_SERVICE_KEY` = sua service key do Supabase
-
-### Render
-1. Crie conta em render.com
-2. Conecte repositório GitHub
-3. Crie "Web Service"
-4. Configurações:
-   - Build Command: `npm run build`
-   - Start Command: `npm start`
-   - Port: `3000`
-5. Adicione Environment Variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_KEY`
-
-### Vercel
-1. Crie conta em vercel.com
-2. Importe repositório
-3. Configurações:
-   - Build Command: `npm run build`
-   - Start Command: (deixe padrão — o Vercel detecta o Next.js)
-4. Adicione Environment Variables no dashboard
+**Plataforma:** Vercel
+**URL de produção:** https://coordinator-app-seven.vercel.app
+**Comando de start:** `next start` (o mesmo código serve local e produção)
 
 ## Variáveis de Ambiente Necessárias
-- SUPABASE_URL
-- SUPABASE_SERVICE_KEY
-- NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-### Opcionais — WhatsApp Business (ver WHATSAPP_SETUP.md)
-- WHATSAPP_TOKEN
-- WHATSAPP_PHONE_ID
-- WHATSAPP_TO_COORDENADOR
-- WHATSAPP_VERIFY_TOKEN
-- WHATSAPP_TEMPLATE_ALUNO / WHATSAPP_TEMPLATE_COORDENADOR / WHATSAPP_TEMPLATE_LANG
+### Obrigatórias
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### E-mail (Gmail SMTP) — ver WHATSAPP_SETUP.md
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `EMAIL_FROM`
+
+### WhatsApp Business — ver WHATSAPP_SETUP.md
+- `WHATSAPP_TOKEN`
+- `WHATSAPP_PHONE_ID`
+- `WHATSAPP_TO_COORDENADOR`
+- `WHATSAPP_VERIFY_TOKEN`
+- `WHATSAPP_TEMPLATE_ALUNO` / `WHATSAPP_TEMPLATE_COORDENADOR` / `WHATSAPP_TEMPLATE_LANG`
 
 ## Observações
+
 - O sistema roda `next start` (o mesmo código serve local e produção).
   Existia um `server.js` separado que reimplementava as rotas e divergia do
   publicado — foi removido, pois causava funcionalidades que só falhavam no ar.
 - `.env.local` está no `.gitignore` (não envia para GitHub)
 - Migrações SQL ficam em `supabase/migrations/`
+
+## Funcionalidades Implementadas
+
+### Sistema de Agendamento
+- Aluno agenda horário com nome, matrícula, curso, turma e e-mail
+- Coordenador aprova, recusa ou remarca pelo painel ou WhatsApp
+- Notificações: aluno por e-mail, coordenador por WhatsApp Business
+- Histórico de atividades e notificações no painel
+
+### Bloco de Notas
+- Anotações salvas no banco (tabela `anotacoes`)
+- Criar, editar, apagar e fixar no topo
+- Aparece em qualquer navegador/aparelho
+
+### Remarcação de Atendimentos
+- Botão "Remarcar" disponível para pendentes e aprovados
+- Modal com checkbox para liberar ou não o horário antigo
+- Aluno recebe e-mail de notificação
+
+### Login do Coordenador
+- Funciona em celular (fallback sessionStorage)
+- Mensagem de erro visível se houver falha de conexão
+- Credenciais podem ser alteradas no painel
+
+## Credenciais e Links
+
+As credenciais do coordenador e links do sistema estão no repositório privado:
+`https://github.com/gilmadara2872/coordinator-app-credentials`
