@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export default function Coordenador() {
   const [page, setPage] = useState('login')
@@ -141,32 +141,96 @@ export default function Coordenador() {
     }
   }
 
-  // Chat state
-  const [chatMsgs, setChatMsgs] = useState([])
-  const [chatText, setChatText] = useState('')
-  const [chatNome, setChatNome] = useState('')
-  const chatBottomRef = useRef(null)
+  // Bloco de notas do coordenador (salvo no banco, aparece em qualquer aparelho)
+  const [anotacoes, setAnotacoes] = useState([])
+  const [novaAnotacao, setNovaAnotacao] = useState('')
+  const [editandoId, setEditandoId] = useState(null)
+  const [editandoTexto, setEditandoTexto] = useState('')
+  const [anotacoesErro, setAnotacoesErro] = useState('')
 
-  useEffect(() => {
-    const saved = localStorage.getItem('coord_chat_messages')
-    if (saved) setChatMsgs(JSON.parse(saved))
-    const savedNome = localStorage.getItem('coord_chat_nome')
-    if (savedNome) setChatNome(savedNome)
+  const carregarAnotacoes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/anotacoes')
+      if (!res.ok) throw new Error('Erro ao carregar anotações')
+      const data = await res.json()
+      setAnotacoes(Array.isArray(data) ? data : [])
+      setAnotacoesErro('')
+    } catch (e) {
+      console.error('Erro ao carregar anotações:', e)
+      setAnotacoesErro('Não foi possível carregar as anotações.')
+    }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('coord_chat_messages', JSON.stringify(chatMsgs))
-  }, [chatMsgs])
-  useEffect(() => {
-    localStorage.setItem('coord_chat_nome', chatNome)
-  }, [chatNome])
+    carregarAnotacoes()
+  }, [carregarAnotacoes])
 
-  const sendCoordMsg = (e) => {
-    e.preventDefault()
-    if (!chatText.trim()) return
-    const nomeVal = chatNome.trim() || 'Coordenador'
-    setChatMsgs([...chatMsgs, {nome: nomeVal, mensagem: chatText.trim(), id: Date.now()}])
-    setChatText('')
+  const salvarAnotacao = async (e) => {
+    e?.preventDefault()
+    const texto = novaAnotacao.trim()
+    if (!texto) return
+    setAnotacoesErro('')
+    try {
+      const res = await fetch('/api/anotacoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      })
+      const corpo = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAnotacoesErro(corro.error || 'Erro ao salvar')
+        return
+      }
+      setAnotacoes((prev) => [corpo, ...prev])
+      setNovaAnotacao('')
+    } catch (err) {
+      setAnotacoesErro('Erro ao salvar a anotação.')
+    }
+  }
+
+  const alternarFixada = async (anotacao) => {
+    try {
+      const res = await fetch('/api/anotacoes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: anotacao.id, fixada: !anotacao.fixada }),
+      })
+      if (!res.ok) throw new Error()
+      setAnotacoes((prev) =>
+        prev.map((a) => (a.id === anotacao.id ? { ...a, fixada: !a.fixada } : a))
+      )
+    } catch {
+      setAnotacoesErro('Não foi possível fixar/desfixar.')
+    }
+  }
+
+  const salvarEdicao = async (id) => {
+    const texto = editandoTexto.trim()
+    if (!texto) return
+    try {
+      const res = await fetch('/api/anotacoes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, texto }),
+      })
+      if (!res.ok) throw new Error()
+      setAnotacoes((prev) => prev.map((a) => (a.id === id ? { ...a, texto } : a)))
+      setEditandoId(null)
+      setEditandoTexto('')
+    } catch {
+      setAnotacoesErro('Não foi possível salvar a edição.')
+    }
+  }
+
+  const excluirAnotacao = async (id) => {
+    if (!window.confirm('Apagar esta anotação?')) return
+    try {
+      const res = await fetch(`/api/anotacoes?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setAnotacoes((prev) => prev.filter((a) => a.id !== id))
+    } catch {
+      setAnotacoesErro('Não foi possível apagar.')
+    }
   }
 
   const handleLogin = (e) => {
@@ -746,53 +810,95 @@ export default function Coordenador() {
         </div>
       )}
 
-      {/* Chat */}
+      {/* Bloco de notas do coordenador */}
       <div className="mb-4 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
         <div className="card p-4 border-blue-500/20 bg-blue-500/5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-blue-400 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              💬 Chat
+              📝 Bloco de Notas
             </h3>
-            <button onClick={() => { setChatMsgs([]); localStorage.removeItem('coord_chat_messages') }} className="text-xs font-bold px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20">🗑️ Limpar</button>
+            <span className="text-xs text-gray-500">salvo no sistema</span>
           </div>
-          {/* Messages */}
-          <div className="space-y-2 max-h-40 overflow-y-auto mb-3 bg-black/20 rounded-xl p-3">
-            {chatMsgs.length === 0 ? (
-              <p className="text-gray-600 text-xs text-center py-2">Nenhuma mensagem ainda.</p>
+
+          {/* Nova anotação */}
+          <form onSubmit={salvarAnotacao} className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={novaAnotacao}
+              onChange={e => setNovaAnotacao(e.target.value)}
+              placeholder="Escreva uma anotação... (ex: fulano pediu para remarcar)"
+              maxLength={2000}
+              className="flex-1 bg-black/20 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 text-sm"
+            />
+            <button type="submit" disabled={!novaAnotacao.trim()} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${novaAnotacao.trim() ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}>
+              Salvar
+            </button>
+          </form>
+
+          {anotacoesErro && (
+            <div className="mb-3 p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-300 text-xs">{anotacoesErro}</div>
+          )}
+
+          {/* Lista */}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {anotacoes.length === 0 ? (
+              <p className="text-gray-600 text-xs text-center py-4">Nenhuma anotação ainda. Escreva a primeira acima.</p>
             ) : (
-              chatMsgs.map((m) => (
-                <div key={m.id} className={`flex ${m.nome === 'Coordenador' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${m.nome === 'Coordenador' ? 'bg-blue-500/20 text-blue-300 ml-auto' : 'bg-gray-700/50 text-white'}`}>
-                    <span className="text-[10px] font-bold opacity-60">{m.nome}: </span>
-                    {m.mensagem}
-                  </div>
+              anotacoes.map((a) => (
+                <div key={a.id} className={`p-3 rounded-xl border transition-all ${a.fixada ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-black/20 border-white/5'}`}>
+                  {editandoId === a.id ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editandoTexto}
+                        onChange={e => setEditandoTexto(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && salvarEdicao(a.id)}
+                        autoFocus
+                        className="flex-1 bg-black/30 border border-gray-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-500/50"
+                      />
+                      <button onClick={() => salvarEdicao(a.id)} className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30">OK</button>
+                      <button onClick={() => setEditandoId(null)} className="px-3 py-1 rounded-lg bg-gray-700/50 text-gray-400 text-xs font-bold hover:bg-gray-700">✕</button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-white text-sm whitespace-pre-wrap break-words">{a.texto}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-[10px] text-gray-500">
+                          {new Date(a.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => alternarFixada(a)}
+                            title={a.fixada ? 'Desfixar' : 'Fixar no topo'}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${a.fixada ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'}`}
+                          >
+                            {a.fixada ? '📌 Fixada' : '📌'}
+                          </button>
+                          <button
+                            onClick={() => { setEditandoId(a.id); setEditandoTexto(a.texto) }}
+                            title="Editar"
+                            className="px-2 py-1 rounded-lg bg-gray-700/50 text-gray-400 text-[10px] font-bold hover:bg-gray-700 transition-colors"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => excluirAnotacao(a.id)}
+                            title="Apagar"
+                            className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-bold hover:bg-red-500/20 transition-colors"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))
             )}
-            <div ref={chatBottomRef} />
           </div>
-          {/* Input */}
-          <form onSubmit={sendCoordMsg} className="flex gap-2">
-            <input
-              type="text"
-              value={chatNome}
-              onChange={e => setChatNome(e.target.value)}
-              placeholder="Seu nome"
-              className="w-24 bg-black/20 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 text-xs"
-            />
-            <input
-              type="text"
-              value={chatText}
-              onChange={e => setChatText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendCoordMsg(e)}
-              placeholder="Digite uma mensagem..."
-              className="flex-1 bg-black/20 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 text-xs"
-            />
-            <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Enviar</button>
-          </form>
         </div>
       </div>
       </main>
