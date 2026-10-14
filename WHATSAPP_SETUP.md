@@ -101,7 +101,7 @@ Em **WhatsApp → API Setup**:
 WHATSAPP_TOKEN          = <token da Meta>
 WHATSAPP_PHONE_ID       = <phone number id>
 WHATSAPP_TO_COORDENADOR = 5588999999999
-WHATSAPP_VERIFY_TOKEN   = coord-2026-xk92
+WHATSAPP_VERIFY_TOKEN   = defina-um-valor-unico-aqui
 ```
 
 ### 4. Cadastrar o webhook (indispensável para o bot)
@@ -111,7 +111,7 @@ Sem este passo o coordenador recebe a mensagem, mas os botões não funcionam.
 Em **WhatsApp → Configuration → Webhook → Edit**:
 
 - **Callback URL:** `https://coordinator-app-seven.vercel.app/api/whatsapp/webhook`
-- **Verify token:** o mesmo texto do `WHATSAPP_VERIFY_TOKEN`
+| **Verify token:** o mesmo texto do `WHATSAPP_VERIFY_TOKEN` (defina um valor único no .env.local) |
 - Clique **Verify and save** e assine o campo **messages**
 
 ### 5. Informar o número no painel

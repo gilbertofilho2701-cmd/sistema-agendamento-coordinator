@@ -267,7 +267,7 @@ export default function Coordenador() {
 
     const validEmails = [storedEmail, 'viniciucoodernador@exemplo.com', 'coordenador@exemplo.com'].filter(Boolean)
     const user = validEmails.includes(email)
-    const pass = senha === storedPass || senha === '123456' || senha === 'vinicus2701'
+    const pass = senha === storedPass || senha === process.env.COORDENADOR_PASS
 
     if (user && pass) {
       // Salva em localStorage com fallback para sessionStorage (celular)
@@ -304,7 +304,7 @@ export default function Coordenador() {
 
     // Verify current password
     const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
-    if (currentPassword !== (storedPass || '123456')) {
+    if (currentPassword !== (storedPass || process.env.COORDENADOR_PASS)) {
       setSettingsError('Senha atual incorreta')
       return
     }

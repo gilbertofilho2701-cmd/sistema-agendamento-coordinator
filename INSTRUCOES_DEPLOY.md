@@ -56,11 +56,11 @@ Depois que o push for feito, siga estes passos:
 ## 4. Credenciais do Coordenador
 
 - **Email:** viniciucoodernador@exemplo.com (ou coordenador@exemplo.com)
-- **Senha:** 123456
+- **Senha:** (definida na variável COORDENADOR_PASS no .env.local)
 
 ## 5. O que foi corrigido/adicionado
 
-✅ **Login corrigido** - A senha hardcoded estava errada (`vinicus2701` → `123456`)
+✅ **Login corrigido** - Senha movida para variável de ambiente COORDENADOR_PASS
 ✅ **Campos de identificação** - Aluno agora informa: nome, matrícula, curso e turma
 ✅ **Transferência corrigida** - Verifica se o novo horário está disponível antes de transferir
 ✅ **Notificações** - Aluno é notificado quando: agendamento é aprovado, rejeitado ou transferido
