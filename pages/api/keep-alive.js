@@ -1,8 +1,15 @@
-import { supabaseAdmin } from '../../lib/notificar'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY
 
 export default async function handler(req, res) {
   try {
-    const supabase = supabaseAdmin()
+    if (!supabaseUrl || !supabaseKey) {
+      return res.status(500).json({ ok: false, error: 'Variáveis de ambiente não configuradas' })
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey)
     
     // SELECT simples para manter o banco ativo
     const { data, error } = await supabase
