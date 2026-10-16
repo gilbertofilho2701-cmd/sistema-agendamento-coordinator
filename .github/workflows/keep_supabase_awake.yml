@@ -10,12 +10,10 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase (evitar hibernação)
+      - name: Ping API (evitar hibernação do banco)
         run: |
           echo "Enviando requisição para manter o banco ativo..."
-          curl -s -o /dev/null -w "Status: %{http_code}\n" \
-            "https://naoqyfuvfqwdckbjemvw.supabase.co/rest/v1/" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZmVyZW5jZSI6InB1YmxpYyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjQ5NjQzMjAwLCJleHAiOjE5NjUyMTkyMDB9.ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5Z" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZmVyZW5jZSI6InB1YmxpYyIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjQ5NjQzMjAwLCJleHAiOjE5NjUyMTkyMDB9.ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5ZqYm5Z" \
+          curl -s -w "\nStatus: %{http_code}\n" \
+            "https://coordinator-app-seven.vercel.app/api/keep-alive" \
             --max-time 30
           echo "Banco mantido com sucesso!"
