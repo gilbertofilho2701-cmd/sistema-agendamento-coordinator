@@ -265,7 +265,7 @@ export default function Coordenador() {
       } catch (e2) { /* ignora */ }
     }
 
-    const validEmails = [storedEmail, 'viniciucoodernador@exemplo.com', 'coordenador@exemplo.com'].filter(Boolean)
+    const validEmails = [storedEmail, 'coordenador@exemplo.com'].filter(Boolean)
     const user = validEmails.includes(email)
     const pass = senha === storedPass || senha === process.env.COORDENADOR_PASS
 

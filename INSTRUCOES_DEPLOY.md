@@ -55,7 +55,7 @@ Depois que o push for feito, siga estes passos:
 
 ## 4. Credenciais do Coordenador
 
-- **Email:** viniciucoodernador@exemplo.com (ou coordenador@exemplo.com)
+- **Email:** coordenador@exemplo.com
 - **Senha:** (definida na variável COORDENADOR_PASS no .env.local)
 
 ## 5. O que foi corrigido/adicionado
