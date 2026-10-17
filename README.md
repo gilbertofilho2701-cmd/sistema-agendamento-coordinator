@@ -18,6 +18,13 @@ Sistema web para agendamento de atendimentos entre alunos e coordenação acadê
 - Histórico de atividades e notificações
 - Configuração do número de WhatsApp
 
+## Automação
+
+### Keep do Banco de Dados
+- GitHub Action que faz ping no banco Supabase a cada 6 dias
+- Evita a hibernação do plano free (que dorme após 7 dias sem atividade)
+- Pode ser rodado manualmente (workflow_dispatch)
+
 ## Tecnologias
 
 - **Frontend:** Next.js + React + Tailwind CSS
