@@ -1,5 +1,5 @@
 -- Migração: telefone para WhatsApp + normalização de status
--- Aplicada em 2026-10-07 no projeto naoqyfuvfqwdckbjemvw
+-- Aplicada em 2026-10-07
 
 -- 1. Telefone do aluno (necessário para o envio por WhatsApp)
 alter table public.agendamentos  add column if not exists telefone text;

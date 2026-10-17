@@ -45,7 +45,7 @@ Sistema web para agendamento de atendimentos entre alunos e coordenação acadê
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/gilmadara2872/sistema-agendamento-coordinator.git
+git clone https://github.com/SEU_USUARIO/sistema-agendamento-coordinator.git
 cd sistema-agendamento-coordinator
 ```
 

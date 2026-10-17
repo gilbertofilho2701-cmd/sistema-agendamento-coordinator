@@ -29,15 +29,15 @@ CREATE INDEX IF NOT EXISTS idx_agendamentos_matricula ON agendamentos(matricula)
 
 ## 2. Fazer Push para o GitHub
 
-O token que você passou pertence à conta `gilmadara2872`, mas o repositório está em `gilbertofilho2701-cmd`. Você tem duas opções:
+Para conectar a Vercel ao repositório, você tem duas opções:
 
-### Opção A: Passar o token da conta gilbertofilho2701-cmd
-Se você tiver acesso a essa conta, me passe o token dela.
+### Opção A: Passar o token da conta do repositório
+Se você tiver acesso a essa conta, use o token dela.
 
-### Opção B: Adicionar gilmadara2872 como colaborador
-1. Acesse: https://github.com/gilbertofilho2701-cmd/sistema-agendamento-coordinator/settings/access
+### Opção B: Adicionar o usuário como colaborador
+1. Acesse: https://github.com/SEU_USUARIO/sistema-agendamento-coordinator/settings/access
 2. Clique em "Add people"
-3. Adicione o usuário `gilmadara2872`
+3. Adicione o usuário desejado
 4. Depois me avise para eu fazer o push
 
 ## 3. Configurar o Railway
@@ -46,9 +46,9 @@ Depois que o push for feito, siga estes passos:
 
 1. Acesse https://railway.app
 2. Crie um novo projeto
-3. Conecte ao repositório `gilbertofilho2701-cmd/sistema-agendamento-coordinator`
+3. Conecte ao repositório desejado
 4. Configure as variáveis de ambiente:
-   - `SUPABASE_URL` = https://dhvufnloudmjcbdzekzb.supabase.co
+   - `SUPABASE_URL` = https://SEU_PROJETO.supabase.co
    - `SUPABASE_SERVICE_KEY` = (sua service role key do Supabase)
    - `PORT` = 3000
 5. O Railway detectará automaticamente o `railway.toml` e fará o deploy

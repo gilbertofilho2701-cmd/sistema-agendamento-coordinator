@@ -1,5 +1,5 @@
 -- Migração: e-mail do aluno, bot de confirmação por WhatsApp, logs do sistema
--- Aplicada em 2026-10-07 no projeto naoqyfuvfqwdckbjemvw
+-- Aplicada em 2026-10-07
 
 -- 1. Dados do aluno no agendamento
 alter table public.agendamentos add column if not exists email            text;
