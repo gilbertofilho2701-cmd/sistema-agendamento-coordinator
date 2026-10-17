@@ -25,6 +25,19 @@ Sistema web para agendamento de atendimentos entre alunos e coordenação acadê
 - Evita a hibernação do plano free (que dorme após 7 dias sem atividade)
 - Pode ser rodado manualmente (workflow_dispatch)
 
+### Notificações Automáticas
+- **E-mail (aluno):** Nodemailer com Gmail SMTP
+  - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM
+- **WhatsApp (coordenador):** Meta Cloud API
+  - WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_TO_COORDENADOR, WHATSAPP_VERIFY_TOKEN
+  - Webhook configurado para receber respostas do coordenador
+  - Botões interativos: Confirmar, Recusar, Remarcar
+
+### Login do Coordenador
+- Configurado via variáveis de ambiente:
+  - COORDENADOR_USER
+  - COORDENADOR_PASS
+
 ## Tecnologias
 
 - **Frontend:** Next.js + React + Tailwind CSS
