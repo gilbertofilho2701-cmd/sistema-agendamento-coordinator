@@ -253,33 +253,39 @@ export default function Coordenador() {
     setLoading(true)
     setError('')
 
-    // Lê credenciais com fallback para sessionStorage (celular/modo privado)
-    let storedEmail = null, storedPass = null
+    // Credenciais padrão do sistema (sempre valem, em qualquer aparelho).
+    // Se o coordenador trocou nas Configurações, o que está salvo no
+    // navegador tem prioridade — assim ele não fica sem acesso ao limpar o cache.
+    const EMAIL_PADRAO = 'viniciucoodernador'
+    const SENHA_PADRAO = '123456'
+
+    let emailSalvo = null, senhaSalva = null
     try {
-      storedEmail = localStorage.getItem('painel_email')
-      storedPass = localStorage.getItem('painel_password')
+      emailSalvo = localStorage.getItem('painel_email')
+      senhaSalva = localStorage.getItem('painel_password')
     } catch (e) {
       try {
-        storedEmail = sessionStorage.getItem('painel_email')
-        storedPass = sessionStorage.getItem('painel_password')
+        emailSalvo = sessionStorage.getItem('painel_email')
+        senhaSalva = sessionStorage.getItem('painel_password')
       } catch (e2) { /* ignora */ }
     }
 
-    const validEmails = [storedEmail, 'coordenador@exemplo.com'].filter(Boolean)
-    const user = validEmails.includes(email)
-    const pass = senha === storedPass || senha === process.env.COORDENADOR_PASS
+    const emailOk = Boolean((emailSalvo && emailSalvo === email) || EMAIL_PADRAO === email)
+    const senhaOk = Boolean((senhaSalva && senhaSalva === senha) || SENHA_PADRAO === senha)
 
-    if (user && pass) {
-      // Salva em localStorage com fallback para sessionStorage (celular)
+    if (emailOk && senhaOk) {
+      // Guarda o que foi usado, para a próxima entrada já valer
+      const credencialEmail = emailSalvo || EMAIL_PADRAO
+      const credencialSenha = senhaSalva || SENHA_PADRAO
       try {
         localStorage.setItem('painel_auth', 'true')
-        localStorage.setItem('painel_email', email)
-        localStorage.setItem('painel_password', pass)
+        localStorage.setItem('painel_email', credencialEmail)
+        localStorage.setItem('painel_password', credencialSenha)
       } catch (e) {
         try {
           sessionStorage.setItem('painel_auth', 'true')
-          sessionStorage.setItem('painel_email', email)
-          sessionStorage.setItem('painel_password', pass)
+          sessionStorage.setItem('painel_email', credencialEmail)
+          sessionStorage.setItem('painel_password', credencialSenha)
         } catch (e2) {
           console.error('Erro ao salvar credenciais:', e2)
         }
@@ -302,9 +308,9 @@ export default function Coordenador() {
       return
     }
 
-    // Verify current password
+    // Verify current password (o que está salvo no navegador, ou a padrão)
     const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
-    if (currentPassword !== (storedPass || process.env.COORDENADOR_PASS)) {
+    if (currentPassword !== (storedPass || '123456')) {
       setSettingsError('Senha atual incorreta')
       return
     }
@@ -387,6 +393,8 @@ export default function Coordenador() {
     return 'Aluno'
   }
 
+  // Aprovar: o PATCH /api/agendamento ja avisa o aluno por e-mail, grava o sino
+  // e registra a atividade. Nao reenviar — o aluno receberia o aviso duas vezes.
   const handleApprove = async (id) => {
     try {
       const res = await fetch('/api/agendamento', {
@@ -395,26 +403,14 @@ export default function Coordenador() {
         body: JSON.stringify({ id, status: 'confirmed' })
       })
       if (!res.ok) throw new Error('Erro ao aprovar')
-      
-      // Notificar aluno (o servidor monta a mensagem e busca o telefone)
-      try {
-        const nr = await fetch('/api/notificacao', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agendamento_id: id, status: 'confirmed' })
-        })
-        const nd = await nr.json()
-        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
-          alert('Agendamento aprovado, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
-        }
-      } catch (e) { console.error('Notificação:', e) }
-      
       await loadData()
     } catch (error) {
       console.error('Erro ao aprovar:', error)
+      alert('Erro ao aprovar o atendimento. Tente novamente.')
     }
   }
 
+  // Recusar: idem — o PATCH ja cuida do aviso ao aluno.
   const handleReject = async (id) => {
     try {
       const res = await fetch('/api/agendamento', {
@@ -423,23 +419,10 @@ export default function Coordenador() {
         body: JSON.stringify({ id, status: 'rejected' })
       })
       if (!res.ok) throw new Error('Erro ao rejeitar')
-      
-      // Notificar aluno (o servidor monta a mensagem e busca o telefone)
-      try {
-        const nr = await fetch('/api/notificacao', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agendamento_id: id, status: 'rejected' })
-        })
-        const nd = await nr.json()
-        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
-          alert('Agendamento recusado, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
-        }
-      } catch (e) { console.error('Notificação:', e) }
-      
       await loadData()
     } catch (error) {
       console.error('Erro ao rejeitar:', error)
+      alert('Erro ao recusar o atendimento. Tente novamente.')
     }
   }
 
@@ -479,25 +462,8 @@ export default function Coordenador() {
         return
       }
       
-      // Enviar notificação para o aluno
-      try {
-        const nr = await fetch('/api/notificacao', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agendamento_id: bookingId,
-            tipo: 'transferencia',
-            mensagem: `🔄 Seu atendimento foi REMARCADO para ${selectedTransferSlot.data} às ${selectedTransferSlot.hora_inicio?.slice(0,5)}`
-          })
-        })
-        const nd = await nr.json()
-        if (nd?.whatsapp && nd.whatsapp.ok === false && !nd.whatsapp.pulado) {
-          alert('Horário transferido, mas o WhatsApp não foi enviado: ' + nd.whatsapp.erro)
-        }
-      } catch (notifErr) {
-        console.error('Erro ao enviar notificação:', notifErr)
-      }
-      
+      // O PUT /api/agendamento/transfer ja avisa o aluno por e-mail e registra a
+      // atividade. Nao reenviar por /api/notificacao (o aluno receberia duas vezes).
       setTransferModal(null)
       setSelectedTransferSlot(null)
       await loadData()
@@ -538,15 +504,16 @@ export default function Coordenador() {
                 {error}
               </div>
             )}
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4" noValidate>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">E-mail</label>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Usuário</label>
                 <input
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-field"
-                  placeholder="coordenador@exemplo.com"
+                  placeholder="viniciucoodernador"
+                  autoComplete="username"
                   autoFocus
                 />
               </div>

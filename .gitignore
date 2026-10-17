@@ -25,3 +25,5 @@ build/
 
 # Credenciais privadas (não enviar para o repositório público)
 .private/
+# Scripts e artefatos de teste (fora do projeto)
+.tmp/
