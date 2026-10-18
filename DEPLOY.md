@@ -59,6 +59,11 @@
 - Mensagem de erro visível se houver falha de conexão
 - Credenciais podem ser alteradas no painel
 
+### Sino de Notificações
+- Coordenador pode marcar notificações como lidas ou limpar todo o histórico
+- Botão "Limpar tudo" disponível no modal de notificações
+- Endpoint: `DELETE /api/notificacao?destinatario=coordenador`
+
 ## Credenciais e Links
 
 As credenciais do coordenador e links do sistema estão na pasta `.private/` dentro deste repositório.

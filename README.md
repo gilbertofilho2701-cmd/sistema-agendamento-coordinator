@@ -14,6 +14,7 @@ Sistema web para agendamento de atendimentos entre alunos e coordenação acadê
 - Painel com login para gerenciar horários e agendamentos
 - Aprova, recusa ou remarca atendimentos pelo painel ou WhatsApp
 - Recebe notificação no WhatsApp com botões interativos (Confirmar/Recusar)
+- Sino de notificações com opção de marcar como limpar histórico
 - Bloco de notas para anotações pessoais
 - Histórico de atividades e notificações
 - Configuração do número de WhatsApp
