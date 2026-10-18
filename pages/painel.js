@@ -514,7 +514,8 @@ export default function Coordenador() {
                   className="input-field"
                   placeholder="viniciucoodernador"
                   autoComplete="username"
-                  autoFocus
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </div>
               <div>
@@ -525,6 +526,7 @@ export default function Coordenador() {
                   onChange={(e) => setSenha(e.target.value)}
                   className="input-field"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                 />
               </div>
               <button
