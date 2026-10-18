@@ -10,10 +10,12 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping API (evitar hibernação do banco)
+      - name: Ping Supabase REST API (evitar hibernação do banco)
         run: |
           echo "Enviando requisição para manter o banco ativo..."
           curl -s -w "\nStatus: %{http_code}\n" \
-            "https://coordinator-9reyj2wi5-gilberto13.vercel.app/api/keep-alive" \
+            "https://naoqyfuvfqwdckbjemvw.supabase.co/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_SECRET_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SECRET_KEY }}" \
             --max-time 30
           echo "Banco mantido com sucesso!"
