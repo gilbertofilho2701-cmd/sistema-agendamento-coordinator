@@ -308,9 +308,9 @@ export default function Coordenador() {
       return
     }
 
-    // Verify current password (o que está salvo no navegador, ou a padrão)
+    // Verify current password: aceita a senha salva no navegador OU a senha padrão
     const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
-    if (currentPassword !== (storedPass || '123456')) {
+    if (currentPassword !== storedPass && currentPassword !== '123456') {
       setSettingsError('Senha atual incorreta')
       return
     }
