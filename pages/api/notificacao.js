@@ -135,5 +135,18 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === 'DELETE') {
+    try {
+      const destinatario = req.query.destinatario || (req.body || {}).destinatario
+      let query = supabase.from('notificacoes').delete()
+      if (destinatario) query = query.eq('destinatario', destinatario)
+      const { error } = await query
+      if (error) throw error
+      return res.status(200).json({ success: true, escopo: destinatario || 'all' })
+    } catch (error) {
+      return res.status(500).json({ error: error.message })
+    }
+  }
+
   return res.status(405).json({ error: 'Método não permitido' })
 }
