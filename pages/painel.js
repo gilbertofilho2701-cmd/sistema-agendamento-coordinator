@@ -1045,7 +1045,6 @@ export default function Coordenador() {
                       const res = await fetch('/api/notificacao?destinatario=coordenador', { method: 'DELETE' })
                       if (!res.ok) throw new Error('Erro ao limpar')
                       setNotificacoes([])
-                      setNaoLidasCoordenador(0)
                       alert('Notificações limpas!')
                     } catch (e) {
                       alert('Erro ao limpar: ' + e.message)
