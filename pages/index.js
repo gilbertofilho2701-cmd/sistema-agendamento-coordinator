@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 function formatDateShort(isoDate) {
   const d = new Date(isoDate + 'T12:00:00')
@@ -47,12 +47,6 @@ export default function Home() {
   const [notifications, setNotifications] = useState([])
   const [cadastro, setCadastro] = useState({ nome: '', matricula: '', curso: '', turma: '', email: '' })
   const [erroCadastro, setErroCadastro] = useState('')
-  const nomeInputRef = useRef(null)
-
-  useEffect(() => {
-    if (nomeInputRef.current) nomeInputRef.current.focus()
-  }, [])
-
   useEffect(() => {
     const savedId = typeof window !== 'undefined' ? localStorage.getItem('aluno_id') : null
     const savedNome = typeof window !== 'undefined' ? localStorage.getItem('aluno_nome') : null
@@ -292,7 +286,6 @@ export default function Home() {
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Identificação do aluno</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <input
-                ref={nomeInputRef}
                 type="text"
                 value={cadastro.nome}
                 onChange={(e) => atualizarCadastro('nome', e.target.value)}

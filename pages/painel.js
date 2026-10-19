@@ -887,7 +887,6 @@ export default function Coordenador() {
                         value={editandoTexto}
                         onChange={e => setEditandoTexto(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && salvarEdicao(a.id)}
-                        autoFocus
                         className="flex-1 bg-black/30 border border-gray-700 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-blue-500/50"
                       />
                       <button onClick={() => salvarEdicao(a.id)} className="px-3 py-1 rounded-lg bg-green-500/20 text-green-400 text-xs font-bold hover:bg-green-500/30">OK</button>
