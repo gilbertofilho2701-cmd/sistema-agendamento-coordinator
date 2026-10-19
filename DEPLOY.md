@@ -98,7 +98,7 @@ apagar as linhas `coordenador_usuario` e `coordenador_senha` da tabela `configur
 
 ### Resolvido em 19/10/2026
 - **Rotas de dados protegidas**: `/api/slots` (criar/editar/apagar), `/api/agendamento`
-  (listar/aprovar/recusar), `/api/agendamento/all`, `/api/agendamento/pending`,
+  (lista completa e aprovar/recusar), `/api/agendamento/all`, `/api/agendamento/pending`,
   `/api/agendamento/transfer`, `/api/anotacoes`, `/api/atividades`, `/api/config` e o sino do
   coordenador exigem sessão (token `Authorization: Bearer ...`, 12 horas). Sem token: 401.
   As rotas do aluno (ver horários livres, pedir agendamento, histórico e o próprio sino)
@@ -113,7 +113,12 @@ O painel guarda um token assinado (HMAC) no navegador e manda em todas as chamad
 - O segredo da assinatura é a variável `SESSION_SECRET`, se existir. Sem ela, o segredo é
   derivado da senha do coordenador — assim, **trocar a senha derruba as sessões antigas**.
 - Sem token válido, as rotas do coordenador respondem `401` e o painel volta para a tela de login.
-- As rotas do aluno continuam abertas (a página dele não tem login, por decisão do projeto).
+- As rotas do aluno continuam abertas (a página dele não tem login, por decisão do projeto):
+  `GET /api/slots`, `POST /api/agendamento`, `GET /api/agendamento?resumo=1`,
+  `GET /api/agendamento?aluno_id=xxx`, `GET /api/historico`, `GET /api/notificacao?aluno_id=`.
+  Ao mexer nelas, testar a página do aluno — foi assim que apareceu que o `GET /api/agendamento`
+  completo não podia ficar aberto nem podia ser fechado sem mais nada (a página precisava de um
+  recorte: só os próprios pedidos e um resumo dos pendentes).
 - O painel avisa quando a aba está com uma versão antiga da página (`GET /api/versao`) — foi o
   que causou a confusão do coordenador no celular: a aba velha conferia a senha no próprio
   navegador e recusava a senha nova. Ao ver a faixa amarela, tocar em "Atualizar".

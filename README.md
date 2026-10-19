@@ -116,7 +116,9 @@ respondem `401`. As rotas sem marca são abertas de propósito: a página do alu
 | `/api/slots` | GET (aberto) | ver horários livres — usado pela página do aluno |
 | `/api/slots` 🔒 | POST, PUT, DELETE | criar, editar e apagar horários |
 | `/api/agendamento` | POST (aberto) | o aluno pede o agendamento |
-| `/api/agendamento` 🔒 | GET, PATCH | listar e aprovar/recusar |
+| `/api/agendamento` | GET `?resumo=1` (aberto) | só horário e situação dos pendentes — o aluno precisa disso para não pedir um horário já solicitado |
+| `/api/agendamento` | GET `?aluno_id=xxx` (aberto) | os pedidos daquele aluno |
+| `/api/agendamento` 🔒 | GET (lista completa), PATCH | listar tudo (com nome, e-mail e telefone) e aprovar/recusar |
 | `/api/agendamento/all` 🔒 | DELETE | apaga todos os agendamentos ("Limpar tudo") |
 | `/api/agendamento/pending` 🔒 | DELETE | apaga os pendentes |
 | `/api/agendamento/transfer` 🔒 | PUT | remarcar atendimento |

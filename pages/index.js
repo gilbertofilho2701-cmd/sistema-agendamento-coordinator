@@ -33,6 +33,9 @@ export default function Home() {
   const [availableDates, setAvailableDates] = useState([])
   const [user, setUser] = useState(null)
   const [bookings, setBookings] = useState([])
+  // Só o horário e a situação dos pedidos pendentes — o suficiente para não oferecer um
+  // horário que outra pessoa já pediu. A lista completa é só do coordenador.
+  const [pendentes, setPendentes] = useState([])
   const [nome, setNome] = useState('')
   const [matricula, setMatricula] = useState('')
   const [curso, setCurso] = useState('')
@@ -190,10 +193,19 @@ export default function Home() {
 
   const loadBookings = async () => {
     try {
-      const res = await fetch('/api/agendamento')
-      if (!res.ok) throw new Error('Erro')
-      const data = await res.json()
-      setBookings(Array.isArray(data) ? data : [])
+      // Resumo dos pendentes (aberto) + os pedidos deste aluno, se ele já se identificou.
+      const resumoRes = await fetch('/api/agendamento?resumo=1')
+      const resumo = resumoRes.ok ? await resumoRes.json() : []
+      setPendentes(Array.isArray(resumo) ? resumo : [])
+
+      const idAluno = user && user.id
+      if (!idAluno) {
+        setBookings([])
+        return
+      }
+      const meusRes = await fetch('/api/agendamento?aluno_id=' + encodeURIComponent(idAluno))
+      const meus = meusRes.ok ? await meusRes.json() : []
+      setBookings(Array.isArray(meus) ? meus : [])
     } catch (error) {
       console.error('Erro:', error)
     }
@@ -403,7 +415,7 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {slots.map((slot, i) => {
-                const isAvailable = slot.disponivel && !bookings.some(b => b.horario_id === slot.id && b.status === "pending")
+                const isAvailable = slot.disponivel && !pendentes.some(b => b.horario_id === slot.id && b.status === "pending")
                 return (
                   <button key={slot.id} onClick={() => handleSlotClick(slot)} disabled={!isAvailable || showConfirmModal} className={`p-5 rounded-xl text-left transition-all border ${isAvailable ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-500/30 cursor-pointer' : 'bg-red-500/10 border-red-500/20 cursor-not-allowed opacity-60'}`} style={{ animationDelay: `${0.2 + i * 0.05}s`, animationFillMode: 'both', animation: `fadeIn 0.3s ease-out ${0.2 + i * 0.05}s both` }}>
                     <div className="flex items-center justify-between">

@@ -5,7 +5,7 @@
 //                                          e manda um e-mail de "recebemos sua solicitação" ao aluno
 // PATCH /api/agendamento { id, status } -> confirma/recusa e avisa o aluno por e-mail
 import { createClient } from '@supabase/supabase-js'
-import { exigirCoordenador } from '../../lib/sessao'
+import { exigirCoordenador, sessaoDoCoordenador } from '../../lib/sessao'
 import {
   notificarCoordenador,
   notificarAluno,
@@ -35,11 +35,40 @@ export default async function handler(req, res) {
   }
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-  // O POST é do aluno (pedir agendamento, sem login). Listar e aprovar/recusar é do coordenador.
-  if (req.method !== 'POST' && !(await exigirCoordenador(req, res))) return
+  // O POST é do aluno (pedir agendamento, sem login). Aprovar/recusar (PATCH) é do coordenador.
+  if (req.method === 'PATCH' && !(await exigirCoordenador(req, res))) return
 
   if (req.method === 'GET') {
     try {
+      // Sem sessão (página do aluno, que não tem login) só passa o que ele precisa:
+      // - ?resumo=1        -> horário e situação dos pedidos pendentes (para não deixar
+      //                       o aluno pedir um horário que outra pessoa já pediu);
+      // - ?aluno_id=xxx    -> os pedidos daquele aluno.
+      // Qualquer outro GET (lista completa, com nome, e-mail e telefone de todos) exige
+      // a sessão do coordenador.
+      const sessao = await sessaoDoCoordenador(req)
+      if (!sessao) {
+        if (req.query.resumo) {
+          const { data, error } = await supabaseAdmin
+            .from('agendamentos')
+            .select('horario_id, status')
+            .eq('status', 'pending')
+          if (error) throw error
+          return res.status(200).json(data || [])
+        }
+        const alunoId = req.query.aluno_id
+        if (!alunoId) {
+          return res.status(401).json({ error: 'Faça login no painel do coordenador para esta ação' })
+        }
+        const { data, error } = await supabaseAdmin
+          .from('agendamentos')
+          .select('*, horarios_disponiveis(*)')
+          .eq('aluno_id', alunoId)
+          .order('created_at', { ascending: false })
+        if (error) throw error
+        return res.status(200).json(data || [])
+      }
+
       const { data, error } = await supabaseAdmin
         .from('agendamentos')
         .select('*, horarios_disponiveis(*)')
