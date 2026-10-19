@@ -2,6 +2,7 @@
 //
 // GET  /api/credenciais                        -> { usuario, configurado }
 // PUT  /api/credenciais { senhaAtual, novoUsuario, novaSenha }
+//      senhaAtual só é exigida quando já existe senha salva (depois disso)
 //                                              -> { success: true, usuario }
 //
 // A senha nunca é devolvida pela API. Fica guardada só como hash scrypt no banco,
@@ -40,18 +41,25 @@ export default async function handler(req, res) {
 
     // PUT e POST fazem a mesma coisa (POST só por compatibilidade)
     const { senhaAtual, novoUsuario, novaSenha } = req.body || {}
-    if (!senhaAtual || !novaSenha) {
-      return res.status(400).json({ error: 'Informe a senha atual e a nova senha' })
+    if (!novaSenha) {
+      return res.status(400).json({ error: 'Informe a nova senha' })
     }
 
     // Usuário atual: o que está salvo no banco, ou o padrão se nada foi salvo.
-    const { usuario: usuarioSalvo } = await lerCredenciais(supabase)
+    const { usuario: usuarioSalvo, senhaHash } = await lerCredenciais(supabase)
     const usuarioAtual = usuarioSalvo || USUARIO_PADRAO
 
-    const senhaAtualOk = await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
-    if (!senhaAtualOk) {
-      await new Promise((r) => setTimeout(r, 400))
-      return res.status(401).json({ error: 'Senha atual incorreta' })
+    // Primeira definição (nada salvo ainda): não existe senha atual para conferir —
+    // é o "primeiro acesso" pela tela de login. Depois disso, a senha atual é exigida.
+    if (senhaHash) {
+      if (!senhaAtual) {
+        return res.status(400).json({ error: 'Informe a senha atual' })
+      }
+      const senhaAtualOk = await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
+      if (!senhaAtualOk) {
+        await new Promise((r) => setTimeout(r, 400))
+        return res.status(401).json({ error: 'Senha atual incorreta' })
+      }
     }
 
     // Campo vazio = manter o usuário atual (trocar só a senha).

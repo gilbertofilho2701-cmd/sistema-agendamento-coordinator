@@ -27,6 +27,15 @@ export default function Coordenador() {
   const [settingsError, setSettingsError] = useState('')
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [salvandoCredenciais, setSalvandoCredenciais] = useState(false)
+  // Modal "definir / alterar senha" da tela de login
+  const [showSenhaModal, setShowSenhaModal] = useState(false)
+  const [senhaConfigurada, setSenhaConfigurada] = useState(false)
+  const [senhaAtualForm, setSenhaAtualForm] = useState('')
+  const [senhaNovaForm, setSenhaNovaForm] = useState('')
+  const [senhaConfirmaForm, setSenhaConfirmaForm] = useState('')
+  const [senhaFormErro, setSenhaFormErro] = useState('')
+  const [senhaFormOk, setSenhaFormOk] = useState('')
+  const [salvandoSenha, setSalvandoSenha] = useState(false)
   const [whatsappNumero, setWhatsappNumero] = useState('')
   const [whatsappStatus, setWhatsappStatus] = useState(null)
   const [showNotif, setShowNotif] = useState(false)
@@ -302,6 +311,61 @@ export default function Coordenador() {
     setPage('login')
   }
 
+  const abrirSenhaModal = async () => {
+    setSenhaFormErro('')
+    setSenhaFormOk('')
+    setSenhaAtualForm('')
+    setSenhaNovaForm('')
+    setSenhaConfirmaForm('')
+    setShowSenhaModal(true)
+    try {
+      const r = await fetch('/api/credenciais')
+      const d = await r.json()
+      setSenhaConfigurada(Boolean(d.configurado))
+      if (d.usuario) setEmail(d.usuario)
+    } catch (e) { /* segue com o que já está na tela */ }
+  }
+
+  const salvarSenha = async (e) => {
+    e.preventDefault()
+    setSenhaFormErro('')
+    setSenhaFormOk('')
+    if (senhaNovaForm.length < 6) {
+      setSenhaFormErro('A nova senha precisa ter pelo menos 6 caracteres.')
+      return
+    }
+    if (senhaNovaForm !== senhaConfirmaForm) {
+      setSenhaFormErro('As duas senhas digitadas não são iguais.')
+      return
+    }
+    if (senhaConfigurada && !senhaAtualForm) {
+      setSenhaFormErro('Informe a senha atual.')
+      return
+    }
+    setSalvandoSenha(true)
+    try {
+      const r = await fetch('/api/credenciais', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senhaAtual: senhaAtualForm, novoUsuario: '', novaSenha: senhaNovaForm }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok) {
+        setSenhaFormOk('Senha salva! Agora entre com ela.')
+        setSenhaConfigurada(true)
+        setSenhaAtualForm('')
+        setSenhaNovaForm('')
+        setSenhaConfirmaForm('')
+        if (d.usuario) setEmail(d.usuario)
+      } else {
+        setSenhaFormErro(d.error || 'Não foi possível salvar a senha')
+      }
+    } catch (e2) {
+      setSenhaFormErro('Não foi possível salvar. Verifique sua conexão.')
+    }
+    setSalvandoSenha(false)
+  }
+
   const handleChangeCredentials = async (e) => {
     e.preventDefault()
     setSettingsError('')
@@ -521,7 +585,7 @@ export default function Coordenador() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-field"
-                  placeholder="viniciucoodernador"
+                  placeholder="coordenadorvinicicu@gmail.com"
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
@@ -552,8 +616,91 @@ export default function Coordenador() {
               </button>
             </form>
             <p className="mt-4 text-center text-xs text-gray-600">Acesso restrito a coordenadores</p>
+            <button
+              type="button"
+              onClick={abrirSenhaModal}
+              className="mt-3 w-full text-center text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+            >
+              Definir / alterar senha do coordenador
+            </button>
           </div>
         </div>
+
+        {showSenhaModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSenhaModal(false)}>
+            <div className="bg-[#12121a] rounded-2xl w-full max-w-md border border-white/10 p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">{senhaConfigurada ? 'Alterar senha' : 'Definir senha'}</h3>
+                <button type="button" onClick={() => setShowSenhaModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all" aria-label="Fechar">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-400 mb-2">
+                {senhaConfigurada
+                  ? 'Informe a senha atual e escolha a nova.'
+                  : 'Primeiro acesso: escolha a senha que você vai usar para entrar no painel.'}
+              </p>
+              <p className="text-xs text-gray-500 mb-4">Usuário: <span className="text-gray-300">{email || 'coordenadorvinicicu@gmail.com'}</span></p>
+
+              <form onSubmit={salvarSenha} className="space-y-4" noValidate>
+                {senhaConfigurada && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Senha Atual</label>
+                    <input
+                      type="password"
+                      value={senhaAtualForm}
+                      onChange={e => setSenhaAtualForm(e.target.value)}
+                      className="input-field"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Nova Senha</label>
+                  <input
+                    type="password"
+                    value={senhaNovaForm}
+                    onChange={e => setSenhaNovaForm(e.target.value)}
+                    className="input-field"
+                    placeholder="mínimo 6 caracteres"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Repita a Nova Senha</label>
+                  <input
+                    type="password"
+                    value={senhaConfirmaForm}
+                    onChange={e => setSenhaConfirmaForm(e.target.value)}
+                    className="input-field"
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                {senhaFormErro && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-300 px-4 py-3 rounded-xl text-sm">{senhaFormErro}</div>
+                )}
+                {senhaFormOk && (
+                  <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded-xl text-sm">{senhaFormOk}</div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={salvandoSenha}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                >
+                  {salvandoSenha ? 'Salvando...' : 'Salvar senha'}
+                </button>
+                <p className="text-center text-xs text-gray-600">A senha vale para qualquer aparelho.</p>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
