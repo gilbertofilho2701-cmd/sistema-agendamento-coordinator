@@ -339,7 +339,7 @@ export default function Coordenador() {
       setSenhaFormErro('As duas senhas digitadas não são iguais.')
       return
     }
-    if (senhaConfigurada && !senhaAtualForm) {
+    if (!senhaAtualForm) {
       setSenhaFormErro('Informe a senha atual.')
       return
     }
@@ -650,25 +650,23 @@ export default function Coordenador() {
 
               <p className="text-xs text-gray-400 mb-2">
                 {senhaConfigurada
-                  ? 'Informe a senha atual e escolha a nova.'
-                  : 'Primeiro acesso: escolha a senha que você vai usar para entrar no painel.'}
+                  ? 'Informe a senha atual, a nova senha e repita a nova.'
+                  : 'Primeiro acesso: informe a senha que você usa hoje para entrar (a padrão do sistema) e escolha a nova.'}
               </p>
               <p className="text-xs text-gray-500 mb-4">Usuário: <span className="text-gray-300">{email || 'coordenadorvinicicu@gmail.com'}</span></p>
 
               <form onSubmit={salvarSenha} className="space-y-4" noValidate>
-                {senhaConfigurada && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Senha Atual</label>
-                    <input
-                      type="password"
-                      value={senhaAtualForm}
-                      onChange={e => setSenhaAtualForm(e.target.value)}
-                      className="input-field"
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Senha Atual</label>
+                  <input
+                    type="password"
+                    value={senhaAtualForm}
+                    onChange={e => setSenhaAtualForm(e.target.value)}
+                    className="input-field"
+                    placeholder="a senha que você usa para entrar hoje"
+                    autoComplete="current-password"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Nova Senha</label>
                   <input

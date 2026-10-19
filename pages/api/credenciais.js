@@ -2,7 +2,7 @@
 //
 // GET  /api/credenciais                        -> { usuario, configurado }
 // PUT  /api/credenciais { senhaAtual, novoUsuario, novaSenha }
-//      senhaAtual só é exigida quando já existe senha salva (depois disso)
+//      senhaAtual é sempre exigida (no primeiro acesso é a senha padrão do sistema)
 //                                              -> { success: true, usuario }
 //
 // A senha nunca é devolvida pela API. Fica guardada só como hash scrypt no banco,
@@ -49,17 +49,15 @@ export default async function handler(req, res) {
     const { usuario: usuarioSalvo, senhaHash } = await lerCredenciais(supabase)
     const usuarioAtual = usuarioSalvo || USUARIO_PADRAO
 
-    // Primeira definição (nada salvo ainda): não existe senha atual para conferir —
-    // é o "primeiro acesso" pela tela de login. Depois disso, a senha atual é exigida.
-    if (senhaHash) {
-      if (!senhaAtual) {
-        return res.status(400).json({ error: 'Informe a senha atual' })
-      }
-      const senhaAtualOk = await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
-      if (!senhaAtualOk) {
-        await new Promise((r) => setTimeout(r, 400))
-        return res.status(401).json({ error: 'Senha atual incorreta' })
-      }
+    // A senha atual é sempre exigida. No primeiro acesso (nada salvo ainda) ela é a
+    // senha usada para entrar hoje — a padrão do sistema. Depois, é a senha do coordenador.
+    if (!senhaAtual) {
+      return res.status(400).json({ error: 'Informe a senha atual' })
+    }
+    const senhaAtualOk = await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
+    if (!senhaAtualOk) {
+      await new Promise((r) => setTimeout(r, 400))
+      return res.status(401).json({ error: 'Senha atual incorreta' })
     }
 
     // Campo vazio = manter o usuário atual (trocar só a senha).
