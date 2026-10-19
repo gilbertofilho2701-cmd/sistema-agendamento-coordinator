@@ -125,6 +125,14 @@ O painel guarda um token assinado (HMAC) no navegador e manda em todas as chamad
 
 ## Observações de manutenção
 
+- **Teste que escreve no banco precisa se limpar.** A página do aluno não tem botão de apagar
+  agendamento: quem cria um pedido de teste só consegue removê-lo pelo banco. Use
+  `testes/e2e-aluno.js` (cria um horário marcado, roda o fluxo e apaga tudo no `finally`, mesmo
+  quando falha) e `testes/limpar-testes.sh` para conferir sobras. Um teste antigo que falhou no
+  meio deixou um pedido de "Teste Automatico Hermes" pendurado — foi assim que se descobriu isso.
+- **Ordem do fluxo do aluno**: identificar -> **escrever o motivo** -> escolher o horário ->
+  confirmar. Clicar no horário com o motivo vazio não abre a confirmação (o app pede o motivo
+  primeiro), então um teste que inverte a ordem trava esperando o botão "Confirmar".
 - **Não rode `npm run build` com o servidor de dev ligado na mesma pasta**: o build apaga a
   pasta `.next` e o dev passa a responder 500 em todas as páginas. Se acontecer, pare o dev,
   apague `.next` e suba de novo.

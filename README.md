@@ -135,6 +135,36 @@ respondem `401`. As rotas sem marca são abertas de propósito: a página do alu
 | `/api/whatsapp/webhook` | GET, POST | webhook do WhatsApp Business |
 | `/api/keep-alive` | GET | mantém o Supabase acordado |
 
+## Testes
+
+### Teste completo da página do aluno
+```
+node testes/e2e-aluno.js                              # contra produção
+ALVO=http://localhost:3006 node testes/e2e-aluno.js   # contra o servidor local
+FORCAR_FALHA=depois-do-pedido node testes/e2e-aluno.js  # confere a limpeza automática
+```
+Cria um horário marcado como `TESTE-AUTOMATICO`, faz o fluxo do aluno (identificar, escrever o
+motivo, escolher o horário, confirmar) e confere o e-mail enviado, o resumo dos pendentes e o
+histórico. **Sempre apaga o que criou, inclusive quando um passo falha.**
+
+Duas regras que o teste segue e que os testes anteriores não seguiam (e que deixaram um
+agendamento de teste pendurado no banco):
+1. **Motivo primeiro, depois o horário.** O app exige o motivo antes de abrir a confirmação:
+   clicar no horário com o campo vazio não abre nada.
+2. **Limpeza no `finally`.** Teste que escreve no banco precisa apagar o que criou mesmo quando
+   falha no meio — a página não tem botão de apagar agendamento, então a limpeza é pelo banco.
+
+Precisa do Playwright instalado (`npm i -g playwright` ou aponte com
+`PLAYWRIGHT_PATH=/caminho/para/node_modules/playwright`).
+
+### Faxina dos dados de teste
+```
+bash testes/limpar-testes.sh --conferir   # só mostra o que existe
+bash testes/limpar-testes.sh              # apaga
+```
+Apaga horários marcados `TESTE-AUTOMATICO` e agendamentos com nome de teste. Rode antes de abrir
+o sistema para os alunos.
+
 ## Documentação
 
 - **Deploy e variáveis:** `DEPLOY.md`
