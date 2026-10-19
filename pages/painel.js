@@ -26,6 +26,7 @@ export default function Coordenador() {
   const [newPassword, setNewPassword] = useState('')
   const [settingsError, setSettingsError] = useState('')
   const [settingsSuccess, setSettingsSuccess] = useState('')
+  const [salvandoCredenciais, setSalvandoCredenciais] = useState(false)
   const [whatsappNumero, setWhatsappNumero] = useState('')
   const [whatsappStatus, setWhatsappStatus] = useState(null)
   const [showNotif, setShowNotif] = useState(false)
@@ -244,7 +245,7 @@ export default function Coordenador() {
     }
   }
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     if (!email || !senha) {
       setError('Preencha todos os campos')
@@ -253,79 +254,87 @@ export default function Coordenador() {
     setLoading(true)
     setError('')
 
-    // Credenciais padrão do sistema (sempre valem, em qualquer aparelho).
-    // Se o coordenador trocou nas Configurações, o que está salvo no
-    // navegador tem prioridade — assim ele não fica sem acesso ao limpar o cache.
-    const EMAIL_PADRAO = 'viniciucoodernador'
-    const SENHA_PADRAO = '123456'
-
-    let emailSalvo = null, senhaSalva = null
     try {
-      emailSalvo = localStorage.getItem('painel_email')
-      senhaSalva = localStorage.getItem('painel_password')
-    } catch (e) {
-      try {
-        emailSalvo = sessionStorage.getItem('painel_email')
-        senhaSalva = sessionStorage.getItem('painel_password')
-      } catch (e2) { /* ignora */ }
-    }
-
-    const emailOk = Boolean((emailSalvo && emailSalvo === email) || EMAIL_PADRAO === email)
-    const senhaOk = Boolean((senhaSalva && senhaSalva === senha) || SENHA_PADRAO === senha)
-
-    if (emailOk && senhaOk) {
-      // Guarda o que foi usado, para a próxima entrada já valer
-      const credencialEmail = emailSalvo || EMAIL_PADRAO
-      const credencialSenha = senhaSalva || SENHA_PADRAO
-      try {
-        localStorage.setItem('painel_auth', 'true')
-        localStorage.setItem('painel_email', credencialEmail)
-        localStorage.setItem('painel_password', credencialSenha)
-      } catch (e) {
+      // A conferência é feita no servidor: as credenciais ficam no banco, então a
+      // troca feita nas Configurações vale em qualquer aparelho (e a senha padrão
+      // deixa de funcionar depois que o coordenador troca).
+      const resp = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: email, senha }),
+      })
+      if (resp.ok) {
+        // Guarda só a marcação da sessão deste navegador — nunca a senha.
         try {
-          sessionStorage.setItem('painel_auth', 'true')
-          sessionStorage.setItem('painel_email', credencialEmail)
-          sessionStorage.setItem('painel_password', credencialSenha)
+          localStorage.setItem('painel_auth', 'true')
+          localStorage.setItem('painel_email', String(email).trim())
         } catch (e2) {
-          console.error('Erro ao salvar credenciais:', e2)
+          try {
+            sessionStorage.setItem('painel_auth', 'true')
+            sessionStorage.setItem('painel_email', String(email).trim())
+          } catch (e3) { /* ignora */ }
         }
+        setSenha('')
+        setPage('dashboard')
+        loadData()
+      } else {
+        const dados = await resp.json().catch(() => ({}))
+        setError(dados.error || 'Usuário ou senha incorretos')
       }
-      setPage('dashboard')
-      loadData()
-    } else {
-      setError('E-mail ou senha incorretos')
+    } catch (e2) {
+      setError('Não foi possível entrar. Verifique sua conexão.')
     }
     setLoading(false)
   }
 
-  const handleChangeCredentials = (e) => {
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('painel_auth')
+      localStorage.removeItem('painel_email')
+      localStorage.removeItem('painel_password')
+      sessionStorage.removeItem('painel_auth')
+      sessionStorage.removeItem('painel_email')
+      sessionStorage.removeItem('painel_password')
+    } catch (e) { /* ignora */ }
+    setSenha('')
+    setError('')
+    setShowSettingsModal(false)
+    setPage('login')
+  }
+
+  const handleChangeCredentials = async (e) => {
     e.preventDefault()
     setSettingsError('')
     setSettingsSuccess('')
 
-    if (!currentPassword || !newEmail || !newPassword) {
-      setSettingsError('Preencha todos os campos')
+    if (!currentPassword || !newPassword) {
+      setSettingsError('Informe a senha atual e a nova senha')
       return
     }
 
-    // Verify current password: aceita a senha salva no navegador OU a senha padrão
-    const storedPass = typeof window !== 'undefined' ? localStorage.getItem('painel_password') : null
-    if (currentPassword !== storedPass && currentPassword !== '123456') {
-      setSettingsError('Senha atual incorreta')
-      return
+    setSalvandoCredenciais(true)
+    try {
+      // A senha atual é conferida no servidor e as novas credenciais são salvas no
+      // banco — por isso passam a valer em qualquer aparelho, e não só neste navegador.
+      const resp = await fetch('/api/credenciais', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senhaAtual: currentPassword, novoUsuario: newEmail, novaSenha: newPassword }),
+      })
+      const dados = await resp.json().catch(() => ({}))
+      if (resp.ok) {
+        try { localStorage.setItem('painel_email', dados.usuario || newEmail) } catch (e2) { /* ignora */ }
+        setSettingsSuccess('Credenciais atualizadas! Já valem em qualquer aparelho. Faça login novamente com elas.')
+        setCurrentPassword('')
+        setNewEmail('')
+        setNewPassword('')
+      } else {
+        setSettingsError(dados.error || 'Não foi possível salvar as credenciais')
+      }
+    } catch (e2) {
+      setSettingsError('Não foi possível salvar. Verifique sua conexão.')
     }
-
-    // Verify current email matches what's logged in
-    const currentEmail = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
-
-    // Save new credentials to localStorage
-    localStorage.setItem('painel_email', newEmail)
-    localStorage.setItem('painel_password', newPassword)
-    setSettingsSuccess('Credenciais atualizadas com sucesso! Faça login novamente.')
-    setShowSettingsModal(false)
-    setCurrentPassword('')
-    setNewEmail('')
-    setNewPassword('')
+    setSalvandoCredenciais(false)
   }
 
   const handleAddSlot = async () => {
@@ -589,6 +598,16 @@ export default function Coordenador() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
               ⚙️
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-gray-700/50 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-600/70 transition-all shadow-lg flex items-center gap-2 w-fit"
+              title="Sair do painel"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Sair
             </button>
             <button
               onClick={() => setShowAddModal(true)}
@@ -968,15 +987,18 @@ export default function Coordenador() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Novo E-mail</label>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Novo Usuário</label>
                 <input
-                  type="email"
+                  type="text"
                   value={newEmail}
                   onChange={e => setNewEmail(e.target.value)}
                   className="input-field"
-                  placeholder="seu@email.com"
-                  required
+                  placeholder="deixe em branco para manter"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
+                <p className="text-[11px] text-gray-500 mt-1">Em branco = troca só a senha.</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Nova Senha</label>
@@ -997,10 +1019,14 @@ export default function Coordenador() {
                   {settingsError}
                 </div>
               )}
-              <button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25">
-                Salvar Credenciais
+              <button
+                type="submit"
+                disabled={salvandoCredenciais}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+              >
+                {salvandoCredenciais ? 'Salvando...' : 'Salvar Credenciais'}
               </button>
-              <p className="text-center text-xs text-gray-600">Será necessário fazer login novamente com as novas credenciais</p>
+              <p className="text-center text-xs text-gray-600">As novas credenciais valem em qualquer aparelho. Depois de salvar, use "Sair" e entre com elas.</p>
             </form>
 
             <div className="mt-6 pt-6 border-t border-white/10 space-y-4">
