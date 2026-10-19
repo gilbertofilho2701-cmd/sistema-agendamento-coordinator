@@ -3,6 +3,7 @@
 //
 // O aluno é avisado por e-mail (e por WhatsApp, se ele tiver informado o número).
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../../lib/sessao'
 import {
   notificarAluno,
   registrarAtividade,
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_KEY não configurados' })
   }
+  if (!(await exigirCoordenador(req, res))) return
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   try {

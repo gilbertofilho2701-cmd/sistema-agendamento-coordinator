@@ -107,20 +107,29 @@ npm run dev
 
 ## Rotas de API
 
+**Login:** as rotas marcadas com 🔒 exigem a sessão do coordenador (token devolvido pelo
+`POST /api/login`, enviado no cabeçalho `Authorization: Bearer <token>`). Sem o token elas
+respondem `401`. As rotas sem marca são abertas de propósito: a página do aluno não tem login.
+
 | Rota | Métodos | Para que serve |
 | --- | --- | --- |
-| `/api/slots` | GET, POST, PUT, DELETE | horários disponíveis (DELETE apaga também os agendamentos ligados) |
-| `/api/agendamento` | GET, POST, PATCH | criar, listar e aprovar/recusar agendamentos |
-| `/api/agendamento/all` | GET | todos os agendamentos |
-| `/api/agendamento/pending` | GET | só os pendentes |
-| `/api/agendamento/transfer` | PUT | remarcar atendimento |
+| `/api/slots` | GET (aberto) | ver horários livres — usado pela página do aluno |
+| `/api/slots` 🔒 | POST, PUT, DELETE | criar, editar e apagar horários |
+| `/api/agendamento` | POST (aberto) | o aluno pede o agendamento |
+| `/api/agendamento` 🔒 | GET, PATCH | listar e aprovar/recusar |
+| `/api/agendamento/all` 🔒 | DELETE | apaga todos os agendamentos ("Limpar tudo") |
+| `/api/agendamento/pending` 🔒 | DELETE | apaga os pendentes |
+| `/api/agendamento/transfer` 🔒 | PUT | remarcar atendimento |
 | `/api/historico` | GET | histórico do aluno (por matrícula) |
-| `/api/notificacao` | GET, PATCH, DELETE | sino do aluno e do coordenador |
-| `/api/anotacoes` | GET, POST, PUT, DELETE | bloco de notas do coordenador |
-| `/api/atividades` | GET | histórico de atividades |
-| `/api/config` | GET, POST | número de WhatsApp do coordenador |
-| `/api/login` | POST | login do coordenador (confere usuário e senha no servidor) |
-| `/api/credenciais` | GET, PUT | consultar / trocar usuário e senha do coordenador |
+| `/api/notificacao` | GET `?aluno_id=` | sino do aluno |
+| `/api/notificacao` 🔒 | GET `?destinatario=coordenador`, POST, PATCH, DELETE | sino do coordenador, marcar lida, limpar |
+| `/api/anotacoes` 🔒 | GET, POST, PUT, DELETE | bloco de notas do coordenador |
+| `/api/atividades` 🔒 | GET | histórico de atividades |
+| `/api/config` 🔒 | GET, POST | número de WhatsApp do coordenador |
+| `/api/login` | POST | login do coordenador (confere usuário e senha no servidor e devolve o token) |
+| `/api/credenciais` | GET (aberto) | diz o usuário e se já existe senha definida |
+| `/api/credenciais` | PUT | troca a senha (exige a senha atual) |
+| `/api/versao` | GET | versão publicada, para o navegador avisar quando a aba está desatualizada |
 | `/api/whatsapp/webhook` | GET, POST | webhook do WhatsApp Business |
 | `/api/keep-alive` | GET | mantém o Supabase acordado |
 
@@ -161,14 +170,22 @@ npm run dev
 
 ### Pendente
 1. **WhatsApp Business do coordenador** — depende de token, phone id e template aprovado pela Meta
-   (passo a passo em `WHATSAPP_SETUP.md`). Hoje a API responde `whatsapp.pulado: true`.
-2. **Autenticação nas rotas de dados** — `/api/slots`, `/api/agendamento`, `/api/anotacoes` e
-   `/api/config` respondem para qualquer pessoa que tenha a URL. O login do painel hoje é
-   apenas uma porta visual: quem souber a URL consegue ler e apagar dados pela API.
-3. **Limpar os horários de teste** — hoje existem 4 horários de exemplo ("Sala de Teste") em
-   2026-10-18 e 2026-10-19. Apagar antes de abrir para os alunos de verdade.
-4. **Testar no celular do coordenador** — o login e a troca de senha foram testados no
-   navegador do computador; falta o teste no aparelho dele.
+   (passo a passo em `WHATSAPP_SETUP.md`). Hoje a API responde `whatsapp.pulado: true`. O campo
+   para trocar o número já existe no painel, em Configurações.
+2. **Teste no celular do coordenador** — o login e a troca de senha foram validados no
+   computador e em navegadores de celular simulados (Chrome, Samsung Internet e Firefox);
+   falta o teste no aparelho dele, com o número real de WhatsApp.
+3. **Safari do iPhone** — não foi possível testar nesta máquina (faltam bibliotecas do sistema
+   para rodar o WebKit). Se algum aluno usar iPhone, vale conferir.
+
+### Já resolvido
+- **Autenticação das rotas de dados** (19/10/2026): criar, editar e apagar dados agora exige a
+  sessão do coordenador (token assinado, 12 horas). As rotas do aluno continuam abertas de
+  propósito, porque a página dele não tem login.
+- **Horários de teste**: os 4 horários "Sala de Teste" de 18 e 19/10/2026 foram apagados; o
+  banco ficou limpo (0 horários, 0 agendamentos, 0 anotações).
+- **Troca de senha**: passou a valer em qualquer aparelho (antes ficava só no navegador onde
+  foi feita), pedindo senha atual + nova senha + repetição.
 
 ## Licença
 

@@ -5,6 +5,7 @@
 //                                          e manda um e-mail de "recebemos sua solicitação" ao aluno
 // PATCH /api/agendamento { id, status } -> confirma/recusa e avisa o aluno por e-mail
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../lib/sessao'
 import {
   notificarCoordenador,
   notificarAluno,
@@ -33,6 +34,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_KEY não configurados' })
   }
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+  // O POST é do aluno (pedir agendamento, sem login). Listar e aprovar/recusar é do coordenador.
+  if (req.method !== 'POST' && !(await exigirCoordenador(req, res))) return
 
   if (req.method === 'GET') {
     try {

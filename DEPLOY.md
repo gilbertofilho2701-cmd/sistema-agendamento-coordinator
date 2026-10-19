@@ -90,15 +90,39 @@ apagar as linhas `coordenador_usuario` e `coordenador_senha` da tabela `configur
 1. **WhatsApp Business do coordenador** — depende do coordenador (token, phone id e template
    aprovado pela Meta). Passo a passo em `WHATSAPP_SETUP.md`. Enquanto isso, a API responde
    `whatsapp.pulado: true` e o coordenador só recebe aviso no sino do painel.
-2. **Autenticação nas rotas de dados** — `/api/slots`, `/api/agendamento`, `/api/anotacoes`,
-   `/api/config` e `/api/atividades` não exigem login. Qualquer pessoa com a URL pode ler e
-   apagar. O login do painel é só uma porta visual; falta proteger as rotas de escrita.
-3. **Horários de teste no banco** — 4 horários "Sala de Teste" em 2026-10-18 e 2026-10-19.
-   Apagar antes de abrir para os alunos.
-4. **Teste no celular do coordenador** — login e troca de senha foram validados no computador.
+2. **Teste no celular do coordenador** — login e troca de senha foram validados no computador
+   e em navegadores de celular simulados (Chrome, Samsung Internet, Firefox). Falta o aparelho
+   dele, com o número real de WhatsApp.
+3. **Safari do iPhone** — não testado (faltam bibliotecas do sistema nesta máquina para rodar
+   o WebKit do Playwright).
+
+### Resolvido em 19/10/2026
+- **Rotas de dados protegidas**: `/api/slots` (criar/editar/apagar), `/api/agendamento`
+  (listar/aprovar/recusar), `/api/agendamento/all`, `/api/agendamento/pending`,
+  `/api/agendamento/transfer`, `/api/anotacoes`, `/api/atividades`, `/api/config` e o sino do
+  coordenador exigem sessão (token `Authorization: Bearer ...`, 12 horas). Sem token: 401.
+  As rotas do aluno (ver horários livres, pedir agendamento, histórico e o próprio sino)
+  continuam abertas de propósito.
+- **Horários de teste** apagados (0 horários, 0 agendamentos, 0 anotações no banco).
+
+## Segurança das rotas
+
+O painel guarda um token assinado (HMAC) no navegador e manda em todas as chamadas:
+`Authorization: Bearer <token>`. O token vale 12 horas e é gerado no `POST /api/login`.
+
+- O segredo da assinatura é a variável `SESSION_SECRET`, se existir. Sem ela, o segredo é
+  derivado da senha do coordenador — assim, **trocar a senha derruba as sessões antigas**.
+- Sem token válido, as rotas do coordenador respondem `401` e o painel volta para a tela de login.
+- As rotas do aluno continuam abertas (a página dele não tem login, por decisão do projeto).
+- O painel avisa quando a aba está com uma versão antiga da página (`GET /api/versao`) — foi o
+  que causou a confusão do coordenador no celular: a aba velha conferia a senha no próprio
+  navegador e recusava a senha nova. Ao ver a faixa amarela, tocar em "Atualizar".
 
 ## Observações de manutenção
 
+- **Não rode `npm run build` com o servidor de dev ligado na mesma pasta**: o build apaga a
+  pasta `.next` e o dev passa a responder 500 em todas as páginas. Se acontecer, pare o dev,
+  apague `.next` e suba de novo.
 - Apagar um agendamento direto no banco **não libera o horário**. O `POST /api/agendamento`
   marca `disponivel: false` no horário; para liberar, usar a recusa/remarcação no painel ou
   atualizar `horarios_disponiveis.disponivel = true`.

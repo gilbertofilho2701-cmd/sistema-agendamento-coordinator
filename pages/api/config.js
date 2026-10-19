@@ -5,6 +5,7 @@
 //
 // O valor do banco tem prioridade; se não existir, usa WHATSAPP_TO_COORDENADOR do ambiente.
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../lib/sessao'
 import { normalizarTelefone, whatsappConfigurado } from '../../lib/whatsapp'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_KEY não configurados' })
   }
+  if (!(await exigirCoordenador(req, res))) return
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   if (req.method === 'GET') {

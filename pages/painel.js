@@ -1,9 +1,48 @@
 import { useState, useEffect, useCallback } from 'react'
+import { VERSAO } from '../lib/versao'
+
+// Toda chamada do painel ao servidor vai com o token da sessão no cabeçalho.
+// O token vem do /api/login e vale 12 horas. Sem ele, as rotas do coordenador
+// respondem 401 — é o que impede alguém de mexer nos dados só com a URL.
+async function apiFetch(url, opcoes = {}) {
+  const cabecalhos = { ...(opcoes.headers || {}) }
+  let token = ''
+  try {
+    token = (typeof window !== 'undefined'
+      && (localStorage.getItem('painel_token') || sessionStorage.getItem('painel_token'))) || ''
+  } catch (e) { /* ignora */ }
+  if (token) cabecalhos.Authorization = `Bearer ${token}`
+
+  const resposta = await fetch(url, { ...opcoes, headers: cabecalhos })
+
+  // 401 nas rotas do coordenador = sessão expirou. Cuidados:
+  // - no login e na troca de senha, 401 quer dizer outra coisa (senha errada);
+  // - se o usuário não está logado, 401 é esperado (a tela de login não tem token) e
+  //   recarregar aqui viraria um loop infinito de recarga.
+  const ehLoginOuSenha = url.startsWith('/api/login') || url.startsWith('/api/credenciais')
+  let sessaoAtiva = false
+  try {
+    sessaoAtiva = typeof window !== 'undefined'
+      && (localStorage.getItem('painel_auth') === 'true' || sessionStorage.getItem('painel_auth') === 'true')
+  } catch (e) { /* ignora */ }
+  if (resposta.status === 401 && !ehLoginOuSenha && sessaoAtiva && typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('painel_auth')
+      localStorage.removeItem('painel_token')
+      sessionStorage.removeItem('painel_auth')
+      sessionStorage.removeItem('painel_token')
+    } catch (e) { /* ignora */ }
+    window.location.reload()
+  }
+  return resposta
+}
 
 export default function Coordenador() {
   const [page, setPage] = useState('login')
+  const [versaoAntiga, setVersaoAntiga] = useState(false)
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+  const [mostrarSenha, setMostrarSenha] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [slots, setSlots] = useState([])
@@ -45,7 +84,7 @@ export default function Coordenador() {
 
   const loadNotificacoes = async () => {
     try {
-      const res = await fetch('/api/notificacao?destinatario=coordenador')
+      const res = await apiFetch('/api/notificacao?destinatario=coordenador')
       const data = await res.json()
       setNotificacoes(Array.isArray(data) ? data : [])
     } catch (e) { console.error('notificações:', e) }
@@ -53,7 +92,7 @@ export default function Coordenador() {
 
   const loadAtividades = async () => {
     try {
-      const res = await fetch('/api/atividades?limit=30')
+      const res = await apiFetch('/api/atividades?limit=30')
       const data = await res.json()
       setAtividades(Array.isArray(data) ? data : [])
     } catch (e) { console.error('atividades:', e) }
@@ -63,7 +102,7 @@ export default function Coordenador() {
     const ids = notificacoes.filter(n => !n.lida).map(n => n.id)
     if (!ids.length) return
     try {
-      await fetch('/api/notificacao', {
+      await apiFetch('/api/notificacao', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids })
@@ -74,10 +113,26 @@ export default function Coordenador() {
 
   const naoLidasCoordenador = notificacoes.filter(n => !n.lida).length
 
+  // Aba antiga = código antigo rodando. Avisa para recarregar, senão o usuário digita
+  // a senha certa e não entende por que não entra.
+  useEffect(() => {
+    let cancelado = false
+    fetch('/api/versao')
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelado && d && d.versao && d.versao !== VERSAO) setVersaoAntiga(true)
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [])
+
   useEffect(() => {
     const auth = typeof window !== 'undefined' ? localStorage.getItem('painel_auth') : null
     const emailUser = typeof window !== 'undefined' ? localStorage.getItem('painel_email') : null
-    if (auth === 'true' && emailUser) {
+    const tokenSalvo = typeof window !== 'undefined'
+      ? (localStorage.getItem('painel_token') || sessionStorage.getItem('painel_token'))
+      : null
+    if (auth === 'true' && emailUser && tokenSalvo) {
       setPage('dashboard')
       loadData()
     } else {
@@ -87,7 +142,7 @@ export default function Coordenador() {
 
   const loadData = async () => {
     try {
-      const slotsRes = await fetch('/api/slots')
+      const slotsRes = await apiFetch('/api/slots')
       const slotsData = await slotsRes.json()
       setSlots(Array.isArray(slotsData) ? slotsData : [])
     } catch (e) {
@@ -95,7 +150,7 @@ export default function Coordenador() {
       setErroCarregamento('Não foi possível carregar os horários. Verifique sua conexão.')
     }
     try {
-      const bookingsRes = await fetch('/api/agendamento')
+      const bookingsRes = await apiFetch('/api/agendamento')
       const bookingsData = await bookingsRes.json()
       // Normaliza o status para minúsculas (evita 'Pending' vs 'pending')
       const normalizados = (Array.isArray(bookingsData) ? bookingsData : []).map(b => ({
@@ -121,7 +176,7 @@ export default function Coordenador() {
   // Carrega o número de WhatsApp salvo ao abrir as configurações
   useEffect(() => {
     if (!showSettingsModal) return
-    fetch('/api/config')
+    apiFetch('/api/config')
       .then(r => r.json())
       .then(d => { if (d?.whatsapp_coordenador) setWhatsappNumero(d.whatsapp_coordenador) })
       .catch(() => {})
@@ -130,7 +185,7 @@ export default function Coordenador() {
   const handleSalvarWhatsapp = async () => {
     setWhatsappStatus(null)
     try {
-      const res = await fetch('/api/config', {
+      const res = await apiFetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ whatsapp_coordenador: whatsappNumero })
@@ -146,7 +201,7 @@ export default function Coordenador() {
 
   const loadTransferSlots = async (bookingId) => {
     try {
-      const res = await fetch('/api/slots')
+      const res = await apiFetch('/api/slots')
       const data = await res.json()
       // Só horários livres (o atual do aluno está ocupado, então não aparece)
       const available = Array.isArray(data) ? data.filter(s => s.disponivel) : []
@@ -172,7 +227,7 @@ export default function Coordenador() {
 
   const carregarAnotacoes = useCallback(async () => {
     try {
-      const res = await fetch('/api/anotacoes')
+      const res = await apiFetch('/api/anotacoes')
       if (!res.ok) throw new Error('Erro ao carregar anotações')
       const data = await res.json()
       setAnotacoes(Array.isArray(data) ? data : [])
@@ -183,9 +238,12 @@ export default function Coordenador() {
     }
   }, [])
 
+  // Só busca as anotações dentro do painel: na tela de login não existe sessão e a
+  // rota responde 401 (antes isso disparava recarregamento sem parar).
   useEffect(() => {
+    if (page !== 'dashboard') return
     carregarAnotacoes()
-  }, [carregarAnotacoes])
+  }, [page, carregarAnotacoes])
 
   const salvarAnotacao = async (e) => {
     e?.preventDefault()
@@ -193,7 +251,7 @@ export default function Coordenador() {
     if (!texto) return
     setAnotacoesErro('')
     try {
-      const res = await fetch('/api/anotacoes', {
+      const res = await apiFetch('/api/anotacoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ texto }),
@@ -212,7 +270,7 @@ export default function Coordenador() {
 
   const alternarFixada = async (anotacao) => {
     try {
-      const res = await fetch('/api/anotacoes', {
+      const res = await apiFetch('/api/anotacoes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: anotacao.id, fixada: !anotacao.fixada }),
@@ -230,7 +288,7 @@ export default function Coordenador() {
     const texto = editandoTexto.trim()
     if (!texto) return
     try {
-      const res = await fetch('/api/anotacoes', {
+      const res = await apiFetch('/api/anotacoes', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, texto }),
@@ -247,7 +305,7 @@ export default function Coordenador() {
   const excluirAnotacao = async (id) => {
     if (!window.confirm('Apagar esta anotação?')) return
     try {
-      const res = await fetch(`/api/anotacoes?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/anotacoes?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       setAnotacoes((prev) => prev.filter((a) => a.id !== id))
     } catch {
@@ -268,20 +326,23 @@ export default function Coordenador() {
       // A conferência é feita no servidor: as credenciais ficam no banco, então a
       // troca feita nas Configurações vale em qualquer aparelho (e a senha padrão
       // deixa de funcionar depois que o coordenador troca).
-      const resp = await fetch('/api/login', {
+      const resp = await apiFetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ usuario: email, senha }),
       })
       if (resp.ok) {
-        // Guarda só a marcação da sessão deste navegador — nunca a senha.
+        // Guarda a marcação da sessão e o token — nunca a senha.
+        const dadosLogin = await resp.json().catch(() => ({}))
         try {
           localStorage.setItem('painel_auth', 'true')
           localStorage.setItem('painel_email', String(email).trim())
+          if (dadosLogin.token) localStorage.setItem('painel_token', dadosLogin.token)
         } catch (e2) {
           try {
             sessionStorage.setItem('painel_auth', 'true')
             sessionStorage.setItem('painel_email', String(email).trim())
+            if (dadosLogin.token) sessionStorage.setItem('painel_token', dadosLogin.token)
           } catch (e3) { /* ignora */ }
         }
         setSenha('')
@@ -302,9 +363,11 @@ export default function Coordenador() {
       localStorage.removeItem('painel_auth')
       localStorage.removeItem('painel_email')
       localStorage.removeItem('painel_password')
+      localStorage.removeItem('painel_token')
       sessionStorage.removeItem('painel_auth')
       sessionStorage.removeItem('painel_email')
       sessionStorage.removeItem('painel_password')
+      sessionStorage.removeItem('painel_token')
     } catch (e) { /* ignora */ }
     setSenha('')
     setError('')
@@ -320,7 +383,7 @@ export default function Coordenador() {
     setSenhaConfirmaForm('')
     setShowSenhaModal(true)
     try {
-      const r = await fetch('/api/credenciais')
+      const r = await apiFetch('/api/credenciais')
       const d = await r.json()
       setSenhaConfigurada(Boolean(d.configurado))
       if (d.usuario) setEmail(d.usuario)
@@ -345,7 +408,7 @@ export default function Coordenador() {
     }
     setSalvandoSenha(true)
     try {
-      const r = await fetch('/api/credenciais', {
+      const r = await apiFetch('/api/credenciais', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senhaAtual: senhaAtualForm, novoUsuario: '', novaSenha: senhaNovaForm }),
@@ -389,7 +452,7 @@ export default function Coordenador() {
     try {
       // A senha atual é conferida no servidor e as novas credenciais são salvas no
       // banco — por isso passam a valer em qualquer aparelho, e não só neste navegador.
-      const resp = await fetch('/api/credenciais', {
+      const resp = await apiFetch('/api/credenciais', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senhaAtual: currentPassword, novoUsuario: newEmail, novaSenha: newPassword }),
@@ -417,7 +480,7 @@ export default function Coordenador() {
       return
     }
     try {
-      const response = await fetch('/api/slots', {
+      const response = await apiFetch('/api/slots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, disponivel: formData.disponivel === true })
@@ -450,7 +513,7 @@ export default function Coordenador() {
   const handleDelete = async (id) => {
     if (!confirm('Excluir este horário?')) return
     try {
-      const response = await fetch('/api/slots', {
+      const response = await apiFetch('/api/slots', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
@@ -480,7 +543,7 @@ export default function Coordenador() {
   // e registra a atividade. Nao reenviar — o aluno receberia o aviso duas vezes.
   const handleApprove = async (id) => {
     try {
-      const res = await fetch('/api/agendamento', {
+      const res = await apiFetch('/api/agendamento', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: 'confirmed' })
@@ -496,7 +559,7 @@ export default function Coordenador() {
   // Recusar: idem — o PATCH ja cuida do aviso ao aluno.
   const handleReject = async (id) => {
     try {
-      const res = await fetch('/api/agendamento', {
+      const res = await apiFetch('/api/agendamento', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: 'rejected' })
@@ -512,7 +575,7 @@ export default function Coordenador() {
   const handleClearAll = async () => {
     if (!confirm('Limpar TODAS as solicitações?')) return
     try {
-      const res = await fetch('/api/agendamento/all', { method: 'DELETE' })
+      const res = await apiFetch('/api/agendamento/all', { method: 'DELETE' })
       if (!res.ok) throw new Error('Erro ao limpar')
       await loadData()
       alert('✅ Todas as solicitações foram limpas!')
@@ -529,7 +592,7 @@ export default function Coordenador() {
       // Find the old slot ID from the booking
       const booking = bookings.find(b => b.id === bookingId)
       const oldHorarioId = booking?.horario_id
-      const res = await fetch('/api/agendamento/transfer', {
+      const res = await apiFetch('/api/agendamento/transfer', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -558,9 +621,23 @@ export default function Coordenador() {
   }
 
   // LOGIN PAGE
+  const avisoVersao = versaoAntiga ? (
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-black text-sm font-medium px-4 py-3 flex items-center justify-between gap-3">
+      <span>Esta página está desatualizada (versão antiga aberta no navegador).</span>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="shrink-0 bg-black/80 text-amber-300 px-3 py-1 rounded-lg font-bold"
+      >
+        Atualizar
+      </button>
+    </div>
+  ) : null
+
   if (page === 'login') {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4 relative overflow-hidden">
+        {avisoVersao}
         <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
           <div className="absolute top-[-20%] left-[-20%] w-[500px] h-[500px] bg-blue-500 rounded-full filter blur-[120px] opacity-[0.06]" />
           <div className="absolute bottom-[-20%] right-[-20%] w-[400px] h-[400px] bg-blue-600 rounded-full filter blur-[100px] opacity-[0.05]" />
@@ -587,6 +664,12 @@ export default function Coordenador() {
                 {error}
               </div>
             )}
+            {error && (
+              <p className="text-xs text-gray-500 -mt-2 mb-4">
+                Dica: toque em "ver" ao lado do campo da senha para conferir o que foi digitado.
+                Espaço sobrando no fim ou letra trocada pelo teclado do celular impedem a entrada.
+              </p>
+            )}
             <form onSubmit={handleLogin} className="space-y-4" noValidate>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Usuário</label>
@@ -603,14 +686,27 @@ export default function Coordenador() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Senha</label>
-                <input
-                  type="password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  className="input-field"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
+                <div className="relative">
+                  <input
+                    type={mostrarSenha ? 'text' : 'password'}
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    className="input-field pr-14"
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenha((v) => !v)}
+                    aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-2 text-xs font-medium text-gray-400 hover:text-white"
+                  >
+                    {mostrarSenha ? 'ocultar' : 'ver'}
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"
@@ -665,6 +761,9 @@ export default function Coordenador() {
                     className="input-field"
                     placeholder="a senha que você usa para entrar hoje"
                     autoComplete="current-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                 </div>
                 <div>
@@ -676,6 +775,9 @@ export default function Coordenador() {
                     className="input-field"
                     placeholder="mínimo 6 caracteres"
                     autoComplete="new-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                 </div>
                 <div>
@@ -687,6 +789,9 @@ export default function Coordenador() {
                     className="input-field"
                     placeholder="••••••••"
                     autoComplete="new-password"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                 </div>
 
@@ -716,6 +821,7 @@ export default function Coordenador() {
   // DASHBOARD PAGE
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white relative overflow-hidden">
+      {avisoVersao}
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         <div className="gradient-orb w-96 h-96 bg-blue-500 top-[-10%] left-[-10%]" style={{ position: 'absolute', top: '-10%', left: '-10%', width: '384px', height: '384px', borderRadius: '50%', filter: 'blur(80px)', opacity: '0.06', background: '#3b82f6' }} />
@@ -1139,6 +1245,9 @@ export default function Coordenador() {
                   className="input-field"
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                 />
               </div>
@@ -1165,6 +1274,9 @@ export default function Coordenador() {
                   className="input-field"
                   placeholder="mínimo 6 caracteres"
                   autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                 />
               </div>
@@ -1177,6 +1289,9 @@ export default function Coordenador() {
                   className="input-field"
                   placeholder="••••••••"
                   autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                 />
               </div>
@@ -1238,7 +1353,7 @@ export default function Coordenador() {
                   onClick={async () => {
                     if (!confirm('Apagar todas as notificações do coordenador?')) return
                     try {
-                      const res = await fetch('/api/notificacao?destinatario=coordenador', { method: 'DELETE' })
+                      const res = await apiFetch('/api/notificacao?destinatario=coordenador', { method: 'DELETE' })
                       if (!res.ok) throw new Error('Erro ao limpar')
                       setNotificacoes([])
                       alert('Notificações limpas!')

@@ -8,6 +8,7 @@
 //        { aluno_id, tipo, mensagem } -> mensagem pronta (compatibilidade)
 // PATCH /api/notificacao { ids: [...] }     -> marca como lidas
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../lib/sessao'
 import {
   notificarAluno,
   notificarCoordenador,
@@ -30,6 +31,14 @@ export default async function handler(req, res) {
   if (!url || !key) {
     return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_KEY não configurados' })
   }
+
+  // O sino do aluno (GET ?aluno_id=...) continua aberto, porque a página do aluno
+  // não tem login. Tudo que é do coordenador exige sessão: o sino dele, marcar como
+  // lida, reenviar aviso e limpar.
+  const doCoordenador = req.method === 'GET' && req.query.destinatario === 'coordenador'
+  const precisaSessao = doCoordenador || req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE'
+  if (precisaSessao && !(await exigirCoordenador(req, res))) return
+
   const supabase = createClient(url, key)
 
   if (req.method === 'GET') {

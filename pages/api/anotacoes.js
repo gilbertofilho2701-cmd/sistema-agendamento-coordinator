@@ -4,7 +4,10 @@
 // POST   /api/anotacoes { texto } -> cria uma anotação
 // PATCH  /api/anotacoes { id, texto?, fixada? } -> edita ou fixa/desfixa
 // DELETE /api/anotacoes?id=N     -> apaga
+//
+// Tudo aqui é do coordenador: exige sessão (token do login).
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../lib/sessao'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
@@ -13,6 +16,7 @@ export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_URL / SUPABASE_SERVICE_KEY não configurados' })
   }
+  if (!(await exigirCoordenador(req, res))) return
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   try {

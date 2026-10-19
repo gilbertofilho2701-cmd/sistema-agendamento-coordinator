@@ -4,7 +4,11 @@
 // POST   /api/slots                 -> cria horário
 // PUT    /api/slots                 -> edita horário { id, ...campos }
 // DELETE /api/slots { id }          -> apaga o horário e os agendamentos ligados a ele
+//
+// O GET é aberto (a página do aluno precisa ver os horários livres). Criar, editar
+// e apagar exigem sessão de coordenador.
 import { createClient } from '@supabase/supabase-js'
+import { exigirCoordenador } from '../../lib/sessao'
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
@@ -31,6 +35,8 @@ export default async function handler(req, res) {
       if (error) throw error
       return res.status(200).json(data || [])
     }
+
+    if (req.method !== 'GET' && !(await exigirCoordenador(req, res))) return
 
     if (req.method === 'POST') {
       const body = req.body || req.query
