@@ -13,6 +13,7 @@ import {
   credenciaisValidas,
   lerCredenciais,
   salvarCredenciais,
+  senhaDeRecuperacaoConfere,
   validarNovaCredencial,
   USUARIO_PADRAO,
 } from '../../lib/credenciais'
@@ -54,7 +55,8 @@ export default async function handler(req, res) {
     if (!senhaAtual) {
       return res.status(400).json({ error: 'Informe a senha atual' })
     }
-    const senhaAtualOk = await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
+    const senhaAtualOk = senhaDeRecuperacaoConfere(senhaAtual)
+      || await credenciaisValidas(supabase, usuarioAtual, senhaAtual)
     if (!senhaAtualOk) {
       await new Promise((r) => setTimeout(r, 400))
       return res.status(401).json({ error: 'Senha atual incorreta' })

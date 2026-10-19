@@ -18,8 +18,23 @@
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_USER`
-- `SMTP_PASS`
+- `SMTP_PASS`  (precisa ser **senha de app** do Gmail, 16 letras)
 - `EMAIL_FROM`
+
+Todas já estão configuradas no Vercel (produção) e o envio foi verificado:
+`POST /api/agendamento` responde `aviso_aluno.email.ok: true` com o id da mensagem.
+Obs.: `.env.local` (local) não tem `SMTP_PASS`, então o envio não funciona rodando local —
+só no ar. Para testar local, gerar uma senha de app e preencher no `.env.local`.
+
+### Credenciais do coordenador (opcional — recuperação de senha)
+- `COORDENADOR_USER` / `COORDENADOR_PASS` (nomes antigos, já existem no Vercel)
+- `COORDENADOR_USUARIO` / `COORDENADOR_SENHA` (mesma função)
+
+Se existirem, essas credenciais **sempre valem** no login, mesmo depois de o coordenador
+trocar a senha no painel — e a senha delas também é aceita no campo "Senha Atual" da troca
+de senha. É a saída completa para senha esquecida (entrar e definir uma nova). Sem elas, a recuperação é
+apagar as linhas `coordenador_usuario` e `coordenador_senha` da tabela `configuracoes`
+(o sistema volta a aceitar a senha padrão `123456`).
 
 ### WhatsApp Business — ver WHATSAPP_SETUP.md
 - `WHATSAPP_TOKEN`
@@ -55,14 +70,42 @@
 - Aluno recebe e-mail de notificação
 
 ### Login do Coordenador
-- Funciona em celular (fallback sessionStorage)
-- Mensagem de erro visível se houver falha de conexão
-- Credenciais podem ser alteradas no painel
+- Conferido no **servidor** (`POST /api/login`), com a senha guardada como hash scrypt
+  na tabela `configuracoes` — não fica em texto e não fica no navegador
+- Usuário padrão: `coordenadorvinicicu@gmail.com` (troca dentro do painel)
+- Senha definida/trocada pelo coordenador na **tela de login** (link
+  "Definir / alterar senha do coordenador") ou em **Configurações (⚙️)** no painel.
+  Os dois caminhos pedem **senha atual + nova senha + repetir a nova** (mínimo 6 caracteres)
+- A troca vale em qualquer aparelho (antes ficava só no navegador onde foi feita — era um bug)
+- Botão **Sair** no topo do painel
+- Funciona em celular; mensagem de erro visível se houver falha de conexão
 
 ### Sino de Notificações
 - Coordenador pode marcar notificações como lidas ou limpar todo o histórico
 - Botão "Limpar tudo" disponível no modal de notificações
 - Endpoint: `DELETE /api/notificacao?destinatario=coordenador`
+
+## Pendências
+
+1. **WhatsApp Business do coordenador** — depende do coordenador (token, phone id e template
+   aprovado pela Meta). Passo a passo em `WHATSAPP_SETUP.md`. Enquanto isso, a API responde
+   `whatsapp.pulado: true` e o coordenador só recebe aviso no sino do painel.
+2. **Autenticação nas rotas de dados** — `/api/slots`, `/api/agendamento`, `/api/anotacoes`,
+   `/api/config` e `/api/atividades` não exigem login. Qualquer pessoa com a URL pode ler e
+   apagar. O login do painel é só uma porta visual; falta proteger as rotas de escrita.
+3. **Horários de teste no banco** — 4 horários "Sala de Teste" em 2026-10-18 e 2026-10-19.
+   Apagar antes de abrir para os alunos.
+4. **Teste no celular do coordenador** — login e troca de senha foram validados no computador.
+
+## Observações de manutenção
+
+- Apagar um agendamento direto no banco **não libera o horário**. O `POST /api/agendamento`
+  marca `disponivel: false` no horário; para liberar, usar a recusa/remarcação no painel ou
+  atualizar `horarios_disponiveis.disponivel = true`.
+- A troca de senha grava nas chaves `coordenador_usuario` e `coordenador_senha` da tabela
+  `configuracoes`. Apagar essas duas linhas volta o sistema para a senha padrão `123456`.
+- O Vercel **bloqueia o deploy** quando o autor do commit não é o e-mail da conta
+  (`gilbertofilho2701@gmail.com`). Conferir `git config user.email` antes de commitar.
 
 ## Credenciais e Links
 
