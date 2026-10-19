@@ -24,6 +24,7 @@ export default function Coordenador() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('')
   const [settingsError, setSettingsError] = useState('')
   const [settingsSuccess, setSettingsSuccess] = useState('')
   const [salvandoCredenciais, setSalvandoCredenciais] = useState(false)
@@ -375,6 +376,14 @@ export default function Coordenador() {
       setSettingsError('Informe a senha atual e a nova senha')
       return
     }
+    if (newPassword.length < 6) {
+      setSettingsError('A nova senha precisa ter pelo menos 6 caracteres')
+      return
+    }
+    if (newPassword !== confirmarNovaSenha) {
+      setSettingsError('As duas senhas digitadas não são iguais')
+      return
+    }
 
     setSalvandoCredenciais(true)
     try {
@@ -392,6 +401,7 @@ export default function Coordenador() {
         setCurrentPassword('')
         setNewEmail('')
         setNewPassword('')
+        setConfirmarNovaSenha('')
       } else {
         setSettingsError(dados.error || 'Não foi possível salvar as credenciais')
       }
@@ -1130,6 +1140,7 @@ export default function Coordenador() {
                   onChange={e => setCurrentPassword(e.target.value)}
                   className="input-field"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -1154,7 +1165,20 @@ export default function Coordenador() {
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   className="input-field"
+                  placeholder="mínimo 6 caracteres"
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">Repita a Nova Senha</label>
+                <input
+                  type="password"
+                  value={confirmarNovaSenha}
+                  onChange={e => setConfirmarNovaSenha(e.target.value)}
+                  className="input-field"
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
                 />
               </div>
